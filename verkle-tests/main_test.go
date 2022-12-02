@@ -69,7 +69,7 @@ const (
 }`
 
 	minBlocksBeforeDeployment = 5
-	minBlocksAfterDeployment  = 32
+	minBlocksAfterDeployment  = 10
 
 	elNodeIdTemplate          = "el-client-%d"
 	clNodeBeaconIdTemplate    = "cl-client-%d-beacon"
@@ -166,10 +166,11 @@ func TestContractDeployment(t *testing.T) {
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced after inducing the partition")
 	logrus.Infof("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeClientsByServiceIds)
-	logrus.Info("----------- VERIFIED THAT ALL NODES ARE IN SYNC AFTER HEALING THE PARTITION --------------")
+	logrus.Info("----------- VERIFIED THAT ALL NODES ARE IN SYNC AFTER DEPLOYING CONTRACT --------------")
 
+	var addr = common.HexToAddress("0xAb2A01BC351770D09611Ac80f1DE076D56E0487d")
 	// TODO verify that the contract deployment is correct
-	//nodeClientsByServiceIds[].StorageAt(ctx, addr, common.Hash{}, nil)
+	//nodeClientsByServiceIds[].StorageAt(ctx, addr, common.Hash{} nil)
 
 	isTestInExecution = false
 }
