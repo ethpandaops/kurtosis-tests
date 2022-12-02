@@ -50,16 +50,26 @@ const (
 
 	participantsPlaceholder = "{{participants_param}}"
 	//participantParam        = `{"elType":"geth","elImage":"ethereum/client-go:v1.10.25","clType":"lodestar","clImage":"chainsafe/lodestar:v1.1.0"}`
-	participantParam     = `{"el_client_type":"geth","el_client_image":"ethereum/client-go:v1.10.26","cl_client_type":"lighthouse","cl_client_image":"sigp/lighthouse:v3.3.0"}`
+	participantParam = `{"el_client_type":"geth","el_client_image":"ethereum/client-go:v1.10.26","cl_client_type":"lighthouse","cl_client_image":"sigp/lighthouse:v3.3.0"}`
+	// Sets parameters to run the kurtosis module with
+	// launch_additional_services decides if grafana, forkmon and other additional servies are launched
+	// participants sets the included clients
+	// network_params sets the networkID and mnemonic. These need to be set to ensure the private key used for signing the
+	// tx is well funded.
 	moduleParamsTemplate = `{
 	"launch_additional_services": false,
 	"participants": [
 		` + participantsPlaceholder + `
+	],
+	"network_params": [
+		{	"network_id": "3151908", 
+			"preregistered_validator_keys_mnemonic": "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+		}
 	]
 }`
 
 	minBlocksBeforeDeployment = 5
-	minBlocksAfterDeployment  = 5
+	minBlocksAfterDeployment  = 32
 
 	elNodeIdTemplate          = "el-client-%d"
 	clNodeBeaconIdTemplate    = "cl-client-%d-beacon"
@@ -159,7 +169,7 @@ func TestContractDeployment(t *testing.T) {
 	logrus.Info("----------- VERIFIED THAT ALL NODES ARE IN SYNC AFTER HEALING THE PARTITION --------------")
 
 	// TODO verify that the contract deployment is correct
-	// nodeClientsByServiceIds[].StorageAt(ctx, addr, common.Hash{}, nil)
+	//nodeClientsByServiceIds[].StorageAt(ctx, addr, common.Hash{}, nil)
 
 	isTestInExecution = false
 }
