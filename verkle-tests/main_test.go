@@ -170,7 +170,7 @@ func TestContractDeployment(t *testing.T) {
 
 	var addr = common.HexToAddress("0xAb2A01BC351770D09611Ac80f1DE076D56E0487d")
 	// TODO verify that the contract deployment is correct
-	//nodeClientsByServiceIds[].StorageAt(ctx, addr, common.Hash{} nil)
+	//nodeClientsByServiceIds[].StorageAt(ctx, addr, common.Hash{}, nil)
 
 	isTestInExecution = false
 }
