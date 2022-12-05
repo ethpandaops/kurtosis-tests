@@ -177,6 +177,7 @@ func TestContractDeployment(t *testing.T) {
 
 	// sanity check: ensure that the tx has been "mined"
 	if pendingcount, err := nodeClientsByServiceIds["el-client-9"].PendingTransactionCount(ctx); pendingcount > 0 || err != nil {
+		logrus.Fatalf("transaction wasn't mined: %d tx remaining in the pool, err=%d", pendingcount, err)
 		t.Fatalf("transaction wasn't mined: %d txs remaining in pool, err = %v", pendingcount, err)
 	}
 	blocknr, err := nodeClientsByServiceIds["el-client-0"].BlockNumber(ctx)
