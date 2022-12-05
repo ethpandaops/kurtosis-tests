@@ -109,7 +109,11 @@ func TestContractDeployment(t *testing.T) {
 	))
 	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveId, isPartitioningEnabled)
 	require.NoError(t, err, "An error occurred creating the enclave")
-	defer kurtosisCtx.StopEnclave(ctx, enclaveId)
+	defer func() {
+		if err := kurtosisCtx.StopEnclave(ctx, enclaveId); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	logrus.Info("------------ EXECUTING MODULE ---------------")
 	starlarkResponseLine, _, err := enclaveCtx.RunStarlarkRemotePackage(ctx, eth2StarlarkPackage, moduleParams, false)
@@ -247,7 +251,7 @@ func printNodeInfoUntilStopped(
 
 	printHeader(nodeClientsByServiceIds)
 	go func() {
-		for true {
+		for {
 			select {
 			case <-time.Tick(3 * time.Second):
 				printAllNodesInfo(ctx, nodeClientsByServiceIds)
@@ -382,7 +386,7 @@ func waitUntilAllNodesGetSynced(
 	errorChan := make(chan error, 1)
 	defer close(errorChan)
 
-	for true {
+	for {
 		select {
 		case <-time.Tick(1 * time.Second):
 			for _, serviceId := range serviceIds {
