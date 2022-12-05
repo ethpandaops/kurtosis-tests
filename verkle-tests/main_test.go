@@ -168,7 +168,7 @@ func TestContractDeployment(t *testing.T) {
 	printAllNodesInfo(ctx, nodeClientsByServiceIds)
 	logrus.Info("----------- VERIFIED THAT ALL NODES ARE IN SYNC AFTER DEPLOYING CONTRACT --------------")
 
-	var addr = common.HexToAddress("0xAb2A01BC351770D09611Ac80f1DE076D56E0487d")
+	//var addr = common.HexToAddress("0xAb2A01BC351770D09611Ac80f1DE076D56E0487d")
 	// TODO verify that the contract deployment is correct
 	//nodeClientsByServiceIds[].StorageAt(ctx, addr, common.Hash{}, nil)
 
