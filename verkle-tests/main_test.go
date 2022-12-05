@@ -92,7 +92,7 @@ var (
 	isTestInExecution bool
 )
 
-func TestContractDeployment(t *testing.T) {
+func TestExtCopyInContractDeployment(t *testing.T) {
 	logrus.SetLevel(logLevel)
 	isTestInExecution = true
 	moduleParams := initNodeIdsAndRenderModuleParam()
@@ -176,21 +176,22 @@ func TestContractDeployment(t *testing.T) {
 	logrus.Info("----------- VERIFIED THAT ALL NODES ARE IN SYNC AFTER DEPLOYING CONTRACT --------------")
 
 	// sanity check: ensure that the tx has been "mined"
-	if pendingcount, err := nodeClientsByServiceIds["el-client-9"].PendingTransactionCount(ctx); pendingcount > 0 || err != nil {
-		logrus.Fatalf("transaction wasn't mined: %d tx remaining in the pool, err=%d", pendingcount, err)
+	if pendingcount, err := nodeClientsByServiceIds["el-client-0"].PendingTransactionCount(ctx); pendingcount > 0 || err != nil {
 		t.Fatalf("transaction wasn't mined: %d txs remaining in pool, err = %v", pendingcount, err)
 	}
+	logrus.Info("----------- VERIFIED THAT THE CONTRACT DEPLOYMENT TX HAS BEEN INCLUDED -------------")
 	blocknr, err := nodeClientsByServiceIds["el-client-0"].BlockNumber(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	logrus.Infof("------------ CHECKING THE EXTCOPY WORKED AT BLOCK '%d' ---------------", blocknr)
-	contractaddr := common.HexToAddress("0xd9145CCE52D386f254917e481eB44e9943F39138")
-	got, err := nodeClientsByServiceIds["el-client-0"].CallContract(ctx, ethereum.CallMsg{
-		From: common.HexToAddress("0xAb2A01BC351770D09611Ac80f1DE076D56E0487d"),
+	from := common.HexToAddress("0xAb2A01BC351770D09611Ac80f1DE076D56E0487d")
+	contractaddr := crypto.CreateAddress(from, 0)
+	got, err := nodeClientsByServiceIds["el-client-0"].PendingCallContract(ctx, ethereum.CallMsg{
+		From: from,
 		To:   &contractaddr,
 		Data: common.FromHex("0xf5668524"),
-	}, big.NewInt(int64(blocknr)))
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
