@@ -175,6 +175,10 @@ func TestContractDeployment(t *testing.T) {
 	printAllNodesInfo(ctx, nodeClientsByServiceIds)
 	logrus.Info("----------- VERIFIED THAT ALL NODES ARE IN SYNC AFTER DEPLOYING CONTRACT --------------")
 
+	// sanity check: ensure that the tx has been "mined"
+	if pendingcount, err := nodeClientsByServiceIds["el-client-9"].PendingTransactionCount(ctx); pendingcount > 0 || err != nil {
+		t.Fatalf("transaction wasn't mined: %d txs remaining in pool, err = %v", pendingcount, err)
+	}
 	blocknr, err := nodeClientsByServiceIds["el-client-0"].BlockNumber(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -438,8 +442,6 @@ func waitUntilAllNodesGetSynced(
 			return 0, stacktrace.NewError("Something unexpected happened, a new value was received from the error channel but it's nil")
 		}
 	}
-
-	return 0, nil
 }
 
 func renderServiceId(template string, nodeId int) services.ServiceID {
