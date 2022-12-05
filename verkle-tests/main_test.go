@@ -180,8 +180,13 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	if pendingcount, err := nodeClientsByServiceIds["el-client-0"].PendingTransactionCount(ctx); pendingcount > 0 || err != nil {
 		t.Fatalf("transaction wasn't mined: %d txs remaining in pool, err = %v", pendingcount, err)
 	}
+	nonce, err := nodeClientsByServiceIds["el-client-0"].PendingNonceAt(ctx, from)
+
+	logrus.Infof("nonce=%d %v", nonce, err)
+
 	// from := common.HexToAddress("0xAb2A01BC351770D09611Ac80f1DE076D56E0487d")
 	contractaddr := crypto.CreateAddress(from, 0)
+	logrus.Infof("reading code %x %x", contractaddr, from)
 	if code, err := nodeClientsByServiceIds["el-client-0"].PendingCodeAt(ctx, contractaddr); len(code) == 0 || err != nil {
 		t.Fatalf("could not get code code=%x err=%v", code, err)
 	}
@@ -190,7 +195,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	logrus.Infof("------------ CHECKING THE EXTCOPY WORKED AT BLOCK '%d' ---------------", blocknr)
+	logrus.Infof("------------ CHECKING THE EXTCOPY WORKED AT BLOCK '%d' %x %x ---------------", blocknr, contractaddr, from)
 	got, err := nodeClientsByServiceIds["el-client-0"].PendingCallContract(ctx, ethereum.CallMsg{
 		From: from,
 		To:   &contractaddr,
