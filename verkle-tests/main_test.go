@@ -162,6 +162,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	}
 	signer := types.LatestSigner(config)
 	testkey, _ := crypto.HexToECDSA("ef5177cd0b6b21c87db5a0bf35d4084a8a57a9d6a064f86d51ac85f2b873a4e2")
+	from := crypto.PubkeyToAddress(testkey.PublicKey)
 	tx, _ := types.SignTx(types.NewContractCreation(0, big.NewInt(0), 3000000, big.NewInt(875000000), contractCode), signer, testkey)
 	err = nodeClientsByServiceIds["el-client-0"].SendTransaction(ctx, tx)
 	if err != nil {
@@ -179,7 +180,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	if pendingcount, err := nodeClientsByServiceIds["el-client-0"].PendingTransactionCount(ctx); pendingcount > 0 || err != nil {
 		t.Fatalf("transaction wasn't mined: %d txs remaining in pool, err = %v", pendingcount, err)
 	}
-	from := common.HexToAddress("0xAb2A01BC351770D09611Ac80f1DE076D56E0487d")
+	// from := common.HexToAddress("0xAb2A01BC351770D09611Ac80f1DE076D56E0487d")
 	contractaddr := crypto.CreateAddress(from, 0)
 	if code, err := nodeClientsByServiceIds["el-client-0"].PendingCodeAt(ctx, contractaddr); len(code) == 0 || err != nil {
 		t.Fatalf("could not get code %x %v", code, err)
