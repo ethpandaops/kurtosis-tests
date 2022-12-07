@@ -21,7 +21,7 @@ jobs:
       - name: Lint
         run: ./bin/golangci-lint run
       - name: Vet
-        run: go vet
+        run: go vet ./...
 
   test:
     runs-on: self-hosted
