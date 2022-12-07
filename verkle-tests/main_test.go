@@ -288,6 +288,7 @@ func printNodeInfoUntilStopped(
 	}()
 
 	stopFunc := func() {
+		fmt.Println("=== stopping ===")
 		printingStopChan <- struct{}{}
 	}
 
