@@ -164,12 +164,13 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	signer := types.LatestSigner(config)
 	testkey, _ := crypto.HexToECDSA("ef5177cd0b6b21c87db5a0bf35d4084a8a57a9d6a064f86d51ac85f2b873a4e2")
 	from := crypto.PubkeyToAddress(testkey.PublicKey)
-	nonce, err := nodeClientsByServiceIds["el-client-0"].PendingNonceAt(ctx, from)
+	client := nodeClientsByServiceIds["el-client-0"]
+	nonce, err := client.PendingNonceAt(ctx, from)
 	if err != nil {
 		t.Fatal("could not get nonce")
 	}
 	tx, _ := types.SignTx(types.NewContractCreation(nonce, big.NewInt(0), 600000, big.NewInt(875000000), contractCode), signer, testkey)
-	err = nodeClientsByServiceIds["el-client-0"].SendTransaction(ctx, tx)
+	err = client.SendTransaction(ctx, tx)
 	if err != nil {
 		t.Fatalf("error sending the contract transaction: %v", err)
 	}
@@ -180,6 +181,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	logrus.Infof("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeClientsByServiceIds)
 	logrus.Info("----------- VERIFIED THAT ALL NODES ARE IN SYNC AFTER DEPLOYING CONTRACT --------------")
+	isTestInExecution = false
 
 	// sanity check: ensure that the tx has been "mined"
 	var contractaddr common.Address
@@ -187,7 +189,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	for {
 		time.Sleep(time.Second * 5)
 		logrus.Info("trying to get the tx receipt")
-		receipt, err = nodeClientsByServiceIds["el-client-0"].TransactionReceipt(ctx, tx.Hash())
+		receipt, err = client.TransactionReceipt(ctx, tx.Hash())
 		if err == nil {
 			contractaddr = receipt.ContractAddress
 			break
@@ -198,16 +200,16 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 
 	// from := common.HexToAddress("0xAb2A01BC351770D09611Ac80f1DE076D56E0487d")
 	logrus.Infof("reading code %x %x", contractaddr, from)
-	if code, err := nodeClientsByServiceIds["el-client-0"].PendingCodeAt(ctx, contractaddr); len(code) == 0 || err != nil {
+	if code, err := client.PendingCodeAt(ctx, contractaddr); len(code) == 0 || err != nil {
 		t.Fatalf("could not get code code=%x err=%v", code, err)
 	}
 	logrus.Info("----------- VERIFIED THAT THE CONTRACT DEPLOYMENT TX HAS BEEN INCLUDED -------------")
-	blocknr, err := nodeClientsByServiceIds["el-client-0"].BlockNumber(ctx)
+	blocknr, err := client.BlockNumber(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	logrus.Infof("------------ CHECKING THE EXTCOPY WORKED AT BLOCK '%d' %x %x ---------------", blocknr, contractaddr, from)
-	got, err := nodeClientsByServiceIds["el-client-0"].PendingCallContract(ctx, ethereum.CallMsg{
+	got, err := client.PendingCallContract(ctx, ethereum.CallMsg{
 		From: from,
 		To:   &contractaddr,
 		Data: common.FromHex("0xf5668524"),
@@ -221,7 +223,6 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	}
 	logrus.Info("----------- VERIFIED THAT CONTRACT DEPLOYMENT PRODUCED THE CORRECT OUTPUT  --------------")
 
-	isTestInExecution = false
 }
 
 func initNodeIdsAndRenderModuleParam() string {
