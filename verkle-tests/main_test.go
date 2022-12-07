@@ -80,8 +80,6 @@ const (
 
 	retriesAttempts      = 20
 	retriesSleepDuration = 10 * time.Millisecond
-
-	newlineChar = "\n"
 )
 
 var (
@@ -219,7 +217,6 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	require.NoError(t, err, "Contract deployment was unsuccessful! ")
 
 	logrus.Info("----------- VERIFIED THAT CONTRACT DEPLOYMENT PRODUCED THE CORRECT OUTPUT  --------------")
-	printAllNodesInfo(ctx, nodeClientsByServiceIds)
 
 	isTestInExecution = false
 }
