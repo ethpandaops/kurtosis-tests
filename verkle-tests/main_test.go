@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
+	"log"
 	"math/big"
 	"sort"
 	"strings"
@@ -21,7 +23,6 @@ import (
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/services"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/engine/lib/kurtosis_context"
 	"github.com/kurtosis-tech/stacktrace"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,8 +38,6 @@ This test demonstrates basic Ethereum testnet behaviour in Kurtosis.
 */
 
 const (
-	logLevel = logrus.InfoLevel
-
 	testName              = "go-ethereum-testnet-with-contract"
 	isPartitioningEnabled = true
 
@@ -92,13 +91,12 @@ var (
 )
 
 func TestExtCopyInContractDeployment(t *testing.T) {
-	logrus.SetLevel(logLevel)
 	isTestInExecution = true
 	moduleParams := initNodeIdsAndRenderModuleParam()
 
 	ctx := context.Background()
 
-	logrus.Info("------------ CONNECTING TO KURTOSIS ENGINE ---------------")
+	log.Printf("------------ CONNECTING TO KURTOSIS ENGINE ---------------")
 	kurtosisCtx, err := kurtosis_context.NewKurtosisContextFromLocalEngine()
 	require.NoError(t, err, "An error occurred connecting to the Kurtosis engine")
 
@@ -114,7 +112,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 		}
 	}()
 
-	logrus.Info("------------ EXECUTING MODULE ---------------")
+	log.Printf("------------ EXECUTING MODULE ---------------")
 	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, moduleParams, false)
 	require.NoError(t, err, "An error executing loading the ETH module")
 	require.Nil(t, starlarkRunResult.InterpretationError)
@@ -124,22 +122,22 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	nodeClientsByServiceIds, err := getElNodeClientsByServiceID(enclaveCtx, idsToQuery)
 	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", idsToQuery)
 
-	logrus.Info("------------ STARTING TEST CASE ---------------")
+	log.Printf("------------ STARTING TEST CASE ---------------")
 	stopPrintingFunc, err := printNodeInfoUntilStopped(
 		ctx,
 		nodeClientsByServiceIds,
 	)
 	require.NoError(t, err, "An error occurred launching the node info printer thread")
 	defer stopPrintingFunc()
-
-	logrus.Infof("------------ CHECKING ALL NODES ARE IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment)
+	
+	log.Printf("------------ CHECKING ALL NODES ARE IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment)
 	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minBlocksBeforeDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced before inducing the partition")
-	logrus.Infof("------------ ALL NODES SYNCED AT BLOCK NUMBER '%v' ------------", syncedBlockNumber)
+	log.Printf("------------ ALL NODES SYNCED AT BLOCK NUMBER '%v' ------------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeClientsByServiceIds)
-	logrus.Info("------------ VERIFIED ALL NODES ARE IN SYNC BEFORE SENDING THE TX ------------")
+	log.Printf("------------ VERIFIED ALL NODES ARE IN SYNC BEFORE SENDING THE TX ------------")
 
-	logrus.Info("------------ SENDING THE CONTRACT DEPLOYMENT TX ------------")
+	log.Printf("------------ SENDING THE CONTRACT DEPLOYMENT TX ------------")
 	// source for this contract can be found at https://gist.github.com/gballet/a23db1e1cb4ed105616b5920feb75985
 	config := &params.ChainConfig{
 		ChainID:             big.NewInt(3151908),
@@ -171,12 +169,12 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 		t.Fatalf("error sending the contract transaction: %v", err)
 	}
 
-	logrus.Infof("------------ CHECKING ALL NODES ARE STILL IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment+minBlocksAfterDeployment)
+	log.Printf("------------ CHECKING ALL NODES ARE STILL IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment+minBlocksAfterDeployment)
 	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minBlocksBeforeDeployment+minBlocksAfterDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced after inducing the partition")
-	logrus.Infof("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
+	log.Printf("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeClientsByServiceIds)
-	logrus.Info("----------- VERIFIED THAT ALL NODES ARE IN SYNC AFTER DEPLOYING CONTRACT --------------")
+	log.Printf("----------- VERIFIED THAT ALL NODES ARE IN SYNC AFTER DEPLOYING CONTRACT --------------")
 
 	// sanity check: ensure that the tx has been "mined"
 	var contractaddr common.Address
@@ -190,19 +188,19 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 		}
 	}
 
-	logrus.Infof("contract address=%x %v", contractaddr, err)
+	log.Printf("contract address=%x %v", contractaddr, err)
 
 	// from := common.HexToAddress("0xAb2A01BC351770D09611Ac80f1DE076D56E0487d")
-	logrus.Infof("reading code %x %x", contractaddr, from)
+	log.Printf("reading code %x %x", contractaddr, from)
 	if code, err := client.PendingCodeAt(ctx, contractaddr); len(code) == 0 || err != nil {
 		t.Fatalf("could not get code code=%x err=%v", code, err)
 	}
-	logrus.Info("----------- VERIFIED THAT THE CONTRACT DEPLOYMENT TX HAS BEEN INCLUDED -------------")
+	log.Printf("----------- VERIFIED THAT THE CONTRACT DEPLOYMENT TX HAS BEEN INCLUDED -------------")
 	blocknr, err := client.BlockNumber(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	logrus.Infof("------------ CHECKING THE EXTCOPY WORKED AT BLOCK '%d' %x %x ---------------", blocknr, contractaddr, from)
+	log.Printf("------------ CHECKING THE EXTCOPY WORKED AT BLOCK '%d' %x %x ---------------", blocknr, contractaddr, from)
 	receivedContractData, err := client.PendingCallContract(ctx, ethereum.CallMsg{
 		From: from,
 		To:   &contractaddr,
@@ -216,7 +214,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	err = compareContractData(expectedContractData, receivedContractData)
 	require.NoError(t, err, "Contract deployment was unsuccessful! ")
 
-	logrus.Info("----------- VERIFIED THAT CONTRACT DEPLOYMENT PRODUCED THE CORRECT OUTPUT  --------------")
+	log.Printf("----------- VERIFIED THAT CONTRACT DEPLOYMENT PRODUCED THE CORRECT OUTPUT  --------------")
 
 	isTestInExecution = false
 }
@@ -351,8 +349,8 @@ func printHeader(nodeClientsByServiceIds map[services.ServiceID]*ethclient.Clien
 		nodeInfoHeaderStr = fmt.Sprintf(nodeInfoHeaderStr+"  %-18s  |", serviceId)
 		nodeInfoHeaderLine2Str = fmt.Sprintf(nodeInfoHeaderLine2Str+"  %-05s - %-10s  |", "block", "hash")
 	}
-	logrus.Infof(nodeInfoHeaderStr)
-	logrus.Infof(nodeInfoHeaderLine2Str)
+	log.Printf(nodeInfoHeaderStr)
+	log.Printf(nodeInfoHeaderLine2Str)
 }
 
 func printAllNodesInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]*ethclient.Client) {
@@ -386,7 +384,7 @@ func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*types.B
 		shortHash := hash[:5] + ".." + hash[len(hash)-3:]
 		nodeInfoStr = fmt.Sprintf(nodeInfoStr+"  %05d - %-10s  |", blockInfo.NumberU64(), shortHash)
 	}
-	logrus.Infof(nodeInfoStr)
+	log.Printf(nodeInfoStr)
 }
 
 func getMostRecentBlockAndStoreIt(
