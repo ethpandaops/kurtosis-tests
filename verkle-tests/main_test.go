@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"log"
 	"math/big"
 	"sort"
@@ -129,7 +128,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	)
 	require.NoError(t, err, "An error occurred launching the node info printer thread")
 	defer stopPrintingFunc()
-	
+
 	log.Printf("------------ CHECKING ALL NODES ARE IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment)
 	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minBlocksBeforeDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced before inducing the partition")
@@ -349,8 +348,8 @@ func printHeader(nodeClientsByServiceIds map[services.ServiceID]*ethclient.Clien
 		nodeInfoHeaderStr = fmt.Sprintf(nodeInfoHeaderStr+"  %-18s  |", serviceId)
 		nodeInfoHeaderLine2Str = fmt.Sprintf(nodeInfoHeaderLine2Str+"  %-05s - %-10s  |", "block", "hash")
 	}
-	log.Printf(nodeInfoHeaderStr)
-	log.Printf(nodeInfoHeaderLine2Str)
+	log.Print(nodeInfoHeaderStr)
+	log.Print(nodeInfoHeaderLine2Str)
 }
 
 func printAllNodesInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]*ethclient.Client) {
@@ -358,7 +357,7 @@ func printAllNodesInfo(ctx context.Context, nodeClientsByServiceIds map[services
 	for serviceId, client := range nodeClientsByServiceIds {
 		nodeBlock, err := getMostRecentNodeBlockWithRetries(ctx, serviceId, client, retriesAttempts, retriesSleepDuration)
 		if err != nil && isTestInExecution {
-			logrus.Warnf("%-25sAn error occurred getting the most recent block, err:\n%v", serviceId, err.Error())
+			log.Printf("%-25sAn error occurred getting the most recent block, err:\n%v", serviceId, err.Error())
 		}
 		nodesCurrentBlock[serviceId] = nodeBlock
 	}
@@ -384,7 +383,7 @@ func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*types.B
 		shortHash := hash[:5] + ".." + hash[len(hash)-3:]
 		nodeInfoStr = fmt.Sprintf(nodeInfoStr+"  %05d - %-10s  |", blockInfo.NumberU64(), shortHash)
 	}
-	log.Printf(nodeInfoStr)
+	log.Print(nodeInfoStr)
 }
 
 func getMostRecentBlockAndStoreIt(
