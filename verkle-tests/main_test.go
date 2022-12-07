@@ -179,14 +179,12 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	logrus.Infof("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeClientsByServiceIds)
 	logrus.Info("----------- VERIFIED THAT ALL NODES ARE IN SYNC AFTER DEPLOYING CONTRACT --------------")
-	isTestInExecution = false
 
 	// sanity check: ensure that the tx has been "mined"
 	var contractaddr common.Address
 	var receipt *types.Receipt
 	for {
 		time.Sleep(time.Second * 5)
-		logrus.Info("trying to get the tx receipt")
 		receipt, err = client.TransactionReceipt(ctx, tx.Hash())
 		if err == nil {
 			contractaddr = receipt.ContractAddress
@@ -207,7 +205,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 		t.Fatal(err)
 	}
 	logrus.Infof("------------ CHECKING THE EXTCOPY WORKED AT BLOCK '%d' %x %x ---------------", blocknr, contractaddr, from)
-	got, err := client.PendingCallContract(ctx, ethereum.CallMsg{
+	receivedContractData, err := client.PendingCallContract(ctx, ethereum.CallMsg{
 		From: from,
 		To:   &contractaddr,
 		Data: common.FromHex("0xf5668524"),
@@ -215,14 +213,23 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var expected = common.FromHex("80604052348015600f57600080fd5b506004361060285760003560e01c8063ac")
-	if !bytes.Equal(expected, got) {
-		t.Fatalf("did not recover the proper value: %x != %x", expected, got)
-	}
-	logrus.Info("----------- VERIFIED THAT CONTRACT DEPLOYMENT PRODUCED THE CORRECT OUTPUT  --------------")
+	var expectedContractData = common.FromHex("80604052348015600f57600080fd5b506004361060285760003560e01c8063ac")
 
+	err = compareContractData(expectedContractData, receivedContractData)
+	require.NoError(t, err, "Contract deployment was unsuccessful! ")
+
+	logrus.Info("----------- VERIFIED THAT CONTRACT DEPLOYMENT PRODUCED THE CORRECT OUTPUT  --------------")
+	printAllNodesInfo(ctx, nodeClientsByServiceIds)
+
+	isTestInExecution = false
 }
 
+func compareContractData(expectedContractData []byte, receivedContractData []byte) error {
+	if !bytes.Equal(expectedContractData, receivedContractData) {
+		return stacktrace.NewError("Contract deployment unsuccessful!")
+	}
+	return nil
+}
 func initNodeIdsAndRenderModuleParam() string {
 	participantParams := make([]string, numParticipants)
 	for idx := 0; idx < numParticipants; idx++ {
