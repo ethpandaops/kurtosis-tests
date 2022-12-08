@@ -279,7 +279,7 @@ func printNodeInfoUntilStopped(
 	go func() {
 		for {
 			select {
-			case <-time.Tick(3 * time.Second):
+			case <-time.Tick(6 * time.Second):
 				printAllNodesInfo(ctx, nodeClientsByServiceIds)
 			case <-printingStopChan:
 				break
