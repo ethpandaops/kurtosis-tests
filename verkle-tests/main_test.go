@@ -49,7 +49,7 @@ const (
 
 	participantsPlaceholder = "{{participants_param}}"
 	//participantParam        = `{"elType":"geth","elImage":"ethereum/client-go:v1.10.25","clType":"lodestar","clImage":"chainsafe/lodestar:v1.1.0"}`
-	participantParam = `{"el_client_type":"geth","el_client_image":"ethereum/client-go:v1.10.26","cl_client_type":"lighthouse","cl_client_image":"sigp/lighthouse:v3.3.0"}`
+	participantParam = `{"el_client_type":"geth","el_client_image":"parithoshj/geth:fix-beverly-hills-v0.2-c65f6b0","cl_client_type":"lighthouse","cl_client_image":"sigp/lighthouse:v3.3.0"}`
 	// Sets parameters to run the kurtosis module with
 	// launch_additional_services decides if grafana, forkmon and other additional servies are launched
 	// participants sets the included clients
