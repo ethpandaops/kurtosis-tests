@@ -107,13 +107,9 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveId, isPartitioningEnabled)
 	require.NoError(t, err, "An error occurred creating the enclave")
 	defer func() {
-		if err := kurtosisCtx.DestroyEnclave(ctx, enclaveId); err != nil {
-			t.Fatal(err)
-		}
-	}()
-	defer func() {
-		if _, err := kurtosisCtx.Clean(ctx, false); err != nil {
-			t.Fatal(err)
+		if !isTestInExecution {
+			_ = kurtosisCtx.DestroyEnclave(ctx, enclaveId)
+			_, _ = kurtosisCtx.Clean(ctx, false)
 		}
 	}()
 
