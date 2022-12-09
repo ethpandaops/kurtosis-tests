@@ -107,7 +107,12 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveId, isPartitioningEnabled)
 	require.NoError(t, err, "An error occurred creating the enclave")
 	defer func() {
-		if err := kurtosisCtx.StopEnclave(ctx, enclaveId); err != nil {
+		if err := kurtosisCtx.DestroyEnclave(ctx, enclaveId); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	defer func() {
+		if _, err := kurtosisCtx.Clean(ctx, false); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -218,15 +223,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 
 	// Test teardown phase
 	isTestInExecution = false
-
-	err = kurtosisCtx.DestroyEnclave(ctx, enclaveId)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = kurtosisCtx.Clean(ctx, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	log.Printf("------------ TEST FINISHED ---------------")
 }
 
 func compareContractData(expectedContractData []byte, receivedContractData []byte) error {
