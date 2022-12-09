@@ -48,6 +48,7 @@ const (
 	numParticipants = 4
 
 	participantsPlaceholder = "{{participants_param}}"
+	//TODO: Replace with image pulled from commit ref
 	//participantParam        = `{"elType":"geth","elImage":"ethereum/client-go:v1.10.25","clType":"lodestar","clImage":"chainsafe/lodestar:v1.1.0"}`
 	participantParam = `{"el_client_type":"geth","el_client_image":"parithoshj/geth:fix-beverly-hills-v0.2-c65f6b0","cl_client_type":"lighthouse","cl_client_image":"sigp/lighthouse:v3.3.0"}`
 	// Sets parameters to run the kurtosis module with
@@ -215,7 +216,17 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 
 	log.Printf("----------- VERIFIED THAT CONTRACT DEPLOYMENT PRODUCED THE CORRECT OUTPUT  --------------")
 
+	// Test teardown phase
 	isTestInExecution = false
+
+	err = kurtosisCtx.DestroyEnclave(ctx, enclaveId)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = kurtosisCtx.Clean(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func compareContractData(expectedContractData []byte, receivedContractData []byte) error {
