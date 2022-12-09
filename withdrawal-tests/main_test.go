@@ -3,14 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
-	"math/big"
-	"sort"
-	"strings"
-	"sync"
-	"testing"
-	"time"
-
+	eth2client "github.com/attestantio/go-eth2-client"
+	"github.com/attestantio/go-eth2-client/http"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/enclaves"
@@ -18,6 +12,13 @@ import (
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/engine/lib/kurtosis_context"
 	"github.com/kurtosis-tech/stacktrace"
 	"github.com/stretchr/testify/require"
+	"log"
+	"math/big"
+	"sort"
+	"strings"
+	"sync"
+	"testing"
+	"time"
 )
 
 /*
@@ -63,22 +64,22 @@ const (
 }`
 
 	minBlocksBeforeDeployment = 5
-	minBlocksAfterDeployment  = 96
+	minBlocksAfterDeployment  = 400
 
 	elNodeIdTemplate          = "el-client-%d"
 	clNodeBeaconIdTemplate    = "cl-client-%d-beacon"
 	clNodeValidatorIdTemplate = "cl-client-%d-validator"
 
-	rpcPortId = "rpc"
-
+	rpcPortId            = "rpc"
+	beaconHttpPortId     = "http"
 	retriesAttempts      = 20
 	retriesSleepDuration = 10 * time.Millisecond
 )
 
 var (
-	nodeIds    = make([]int, numParticipants)
-	idsToQuery = make([]services.ServiceID, numParticipants)
-
+	nodeIds           = make([]int, numParticipants)
+	elIdsToQuery      = make([]services.ServiceID, numParticipants)
+	clIdsToQuery      = make([]services.ServiceID, numParticipants)
 	isTestInExecution bool
 )
 
@@ -113,28 +114,33 @@ func TestBasicTestnetFinality(t *testing.T) {
 	require.Empty(t, starlarkRunResult.ValidationErrors)
 	require.Nil(t, starlarkRunResult.ExecutionError)
 
-	nodeClientsByServiceIds, err := getElNodeClientsByServiceID(enclaveCtx, idsToQuery)
-	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", idsToQuery)
+	nodeELClientsByServiceIds, err := getElNodeClientsByServiceID(enclaveCtx, elIdsToQuery)
+	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", elIdsToQuery)
+
+	nodeCLClientsByServiceIds, err := getCLNodeClientsByServiceID(ctx, enclaveCtx, clIdsToQuery)
+	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", clIdsToQuery)
+
+	fmt.Println(nodeCLClientsByServiceIds)
 
 	log.Printf("------------ STARTING TEST CASE ---------------")
 	stopPrintingFunc, err := printNodeInfoUntilStopped(
 		ctx,
-		nodeClientsByServiceIds,
+		nodeELClientsByServiceIds,
 	)
 	require.NoError(t, err, "An error occurred launching the node info printer thread")
 	defer stopPrintingFunc()
 
 	log.Printf("------------ CHECKING ALL NODES ARE IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment)
-	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minBlocksBeforeDeployment)
+	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, elIdsToQuery, nodeELClientsByServiceIds, minBlocksBeforeDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced")
 	log.Printf("------------ ALL NODES SYNCED AT BLOCK NUMBER '%v' ------------", syncedBlockNumber)
-	printAllNodesInfo(ctx, nodeClientsByServiceIds)
+	printAllNodesInfo(ctx, nodeELClientsByServiceIds)
 	log.Printf("------------ VERIFIED ALL NODES ARE IN SYNC ------------")
 
-	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minBlocksBeforeDeployment+minBlocksAfterDeployment)
+	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, elIdsToQuery, nodeELClientsByServiceIds, minBlocksBeforeDeployment+minBlocksAfterDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced after inducing the partition")
 	log.Printf("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
-	printAllNodesInfo(ctx, nodeClientsByServiceIds)
+	printAllNodesInfo(ctx, nodeELClientsByServiceIds)
 
 	// Test teardown phase
 	isTestInExecution = false
@@ -145,10 +151,47 @@ func initNodeIdsAndRenderModuleParam() string {
 	participantParams := make([]string, numParticipants)
 	for idx := 0; idx < numParticipants; idx++ {
 		nodeIds[idx] = idx
-		idsToQuery[idx] = renderServiceId(elNodeIdTemplate, nodeIds[idx])
+		elIdsToQuery[idx] = renderServiceId(elNodeIdTemplate, nodeIds[idx])
+		clIdsToQuery[idx] = renderServiceId(clNodeBeaconIdTemplate, nodeIds[idx])
 		participantParams[idx] = participantParam
 	}
 	return strings.ReplaceAll(moduleParamsTemplate, participantsPlaceholder, strings.Join(participantParams, ","))
+}
+
+func getCLNodeClientsByServiceID(
+	ctx context.Context,
+	enclaveCtx *enclaves.EnclaveContext,
+	serviceIds []services.ServiceID,
+) (
+	resultNodeClientsByServiceId map[services.ServiceID]*eth2client.Service,
+	resultErr error,
+) {
+	nodeClientsByServiceIds := map[services.ServiceID]*eth2client.Service{}
+	for _, serviceId := range serviceIds {
+		serviceCtx, err := enclaveCtx.GetServiceContext(serviceId)
+		if err != nil {
+			return nil, stacktrace.Propagate(err, "A fatal error occurred getting context for service '%v'", serviceId)
+		}
+		rpcPort, found := serviceCtx.GetPublicPorts()[beaconHttpPortId]
+
+		if !found {
+			return nil, stacktrace.NewError("Service '%v' doesn't have expected RPC port with ID '%v'", serviceId, rpcPortId)
+		}
+
+		url := fmt.Sprintf(
+			"http://%v:%v",
+			serviceCtx.GetMaybePublicIPAddress(),
+			rpcPort.GetNumber(),
+		)
+		client, err := http.New(ctx,
+			// WithAddress supplies the address of the beacon node, as a URL.
+			http.WithAddress(url),
+		)
+
+		nodeClientsByServiceIds[serviceId] = &client
+
+	}
+	return nodeClientsByServiceIds, nil
 }
 
 func getElNodeClientsByServiceID(
@@ -179,8 +222,8 @@ func getElNodeClientsByServiceID(
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "A fatal error occurred creating the ETH client for service '%v'", serviceId)
 		}
-
 		nodeClientsByServiceIds[serviceId] = client
+
 	}
 	return nodeClientsByServiceIds, nil
 }
