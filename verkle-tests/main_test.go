@@ -48,6 +48,7 @@ const (
 	numParticipants = 4
 
 	participantsPlaceholder = "{{participants_param}}"
+	//TODO: Replace with image pulled from commit ref
 	//participantParam        = `{"elType":"geth","elImage":"ethereum/client-go:v1.10.25","clType":"lodestar","clImage":"chainsafe/lodestar:v1.1.0"}`
 	participantParam = `{"el_client_type":"geth","el_client_image":"parithoshj/geth:fix-beverly-hills-v0.2-c65f6b0","cl_client_type":"lighthouse","cl_client_image":"sigp/lighthouse:v3.3.0"}`
 	// Sets parameters to run the kurtosis module with
@@ -106,8 +107,9 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveId, isPartitioningEnabled)
 	require.NoError(t, err, "An error occurred creating the enclave")
 	defer func() {
-		if err := kurtosisCtx.StopEnclave(ctx, enclaveId); err != nil {
-			t.Fatal(err)
+		if !isTestInExecution {
+			_ = kurtosisCtx.DestroyEnclave(ctx, enclaveId)
+			_, _ = kurtosisCtx.Clean(ctx, false)
 		}
 	}()
 
@@ -215,7 +217,9 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 
 	log.Printf("----------- VERIFIED THAT CONTRACT DEPLOYMENT PRODUCED THE CORRECT OUTPUT  --------------")
 
+	// Test teardown phase
 	isTestInExecution = false
+	log.Printf("------------ TEST FINISHED ---------------")
 }
 
 func compareContractData(expectedContractData []byte, receivedContractData []byte) error {
