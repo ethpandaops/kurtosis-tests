@@ -381,7 +381,6 @@ func printNodeInfoUntilStopped(
 	}()
 
 	stopFunc := func() {
-		fmt.Println("=== stopping ===")
 		printingStopChan <- struct{}{}
 	}
 
@@ -472,6 +471,11 @@ func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*types.B
 
 	for _, serviceId := range sortedServiceIds {
 		blockInfo := nodeCurrentBlocks[serviceId]
+		// hack, it looks like shutting down the system has some
+		// non-determinism
+		if blockInfo == nil {
+			continue
+		}
 		hash := blockInfo.Hash().Hex()
 		shortHash := hash[:5] + ".." + hash[len(hash)-3:]
 		nodeInfoStr = fmt.Sprintf(nodeInfoStr+"  %05d - %-10s  |", blockInfo.NumberU64(), shortHash)
