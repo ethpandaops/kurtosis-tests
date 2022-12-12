@@ -186,6 +186,9 @@ func getCLNodeClientsByServiceID(
 				rpcPort.GetNumber(),
 			)),
 		)
+		if err != nil {
+			return nil, stacktrace.Propagate(err, "A fatal error occurred creating the ETH client for service '%v'", serviceId)
+		}
 
 		nodeClientsByServiceIds[serviceId] = &client
 
