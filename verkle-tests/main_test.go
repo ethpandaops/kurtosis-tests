@@ -109,7 +109,6 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	defer func() {
 		if !isTestInExecution {
 			_ = kurtosisCtx.DestroyEnclave(ctx, enclaveId)
-			_, _ = kurtosisCtx.Clean(ctx, false)
 		}
 	}()
 
