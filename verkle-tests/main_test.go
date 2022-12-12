@@ -301,7 +301,7 @@ func TestReadGenesisTree(t *testing.T) {
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced after inducing the partition")
 	log.Printf("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeClientsByServiceIds)
-	log.Printf("----------- VERIFIED THAT ALL NODES ARE IN SYNC AFTER DEPLOYING CONTRACT --------------")
+	log.Printf("----------- VERIFIED THAT ALL NODES ARE IN SYNC AFTER DEPLOYING TX --------------")
 
 	// from := common.HexToAddress("0xAb2A01BC351770D09611Ac80f1DE076D56E0487d")
 	log.Printf("----------- VERIFIED THAT THE TX HAS BEEN INCLUDED -------------")
