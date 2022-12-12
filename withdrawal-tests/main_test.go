@@ -178,14 +178,13 @@ func getCLNodeClientsByServiceID(
 			return nil, stacktrace.NewError("Service '%v' doesn't have expected RPC port with ID '%v'", serviceId, rpcPortId)
 		}
 
-		url := fmt.Sprintf(
-			"http://%v:%v",
-			serviceCtx.GetMaybePublicIPAddress(),
-			rpcPort.GetNumber(),
-		)
 		client, err := http.New(ctx,
 			// WithAddress supplies the address of the beacon node, as a URL.
-			http.WithAddress(url),
+			http.WithAddress(fmt.Sprintf(
+				"http://%v:%v",
+				serviceCtx.GetMaybePublicIPAddress(),
+				rpcPort.GetNumber(),
+			)),
 		)
 
 		nodeClientsByServiceIds[serviceId] = &client
