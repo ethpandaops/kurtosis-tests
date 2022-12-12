@@ -293,7 +293,7 @@ func TestReadGenesisTree(t *testing.T) {
 	tx, _ := types.SignTx(types.NewTransaction(nonce, depositleafnoderesolvingaddr, big.NewInt(1), 600000, big.NewInt(875000000), nil), signer, testkey)
 	err = client.SendTransaction(ctx, tx)
 	if err != nil {
-		t.Fatalf("error sending the contract transaction: %v", err)
+		t.Fatalf("error sending the transaction: %v", err)
 	}
 
 	log.Printf("------------ CHECKING ALL NODES ARE STILL IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment+minBlocksAfterDeployment)
