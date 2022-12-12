@@ -31,5 +31,7 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: 1.18
+      - name: check if file exists
+        run: cat /home/devops/hi.txt
       - name: Test
         run: go test -v -p 1 -race -timeout 99999s ./...
