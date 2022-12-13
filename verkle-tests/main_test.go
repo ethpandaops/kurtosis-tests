@@ -87,7 +87,29 @@ var (
 
 	isTestInExecution bool
 
+	// Deployment code for a contract that calls EXTCOPY during contract initialization.
+	// source for this contract can be found at https://gist.github.com/gballet/a23db1e1cb4ed105616b5920feb75985
 	contractCode = common.Hex2Bytes("60806040526040516100109061017b565b604051809103906000f08015801561002c573d6000803e3d6000fd5b506000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555034801561007857600080fd5b5060008067ffffffffffffffff8111156100955761009461024a565b5b6040519080825280601f01601f1916602001820160405280156100c75781602001600182028036833780820191505090505b50905060008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1690506020600083833c81610101906101e3565b60405161010d90610187565b61011791906101a3565b604051809103906000f080158015610133573d6000803e3d6000fd5b50600160006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550505061029b565b60d58061046783390190565b6102068061053c83390190565b61019d816101d9565b82525050565b60006020820190506101b86000830184610194565b92915050565b6000819050602082019050919050565b600081519050919050565b6000819050919050565b60006101ee826101ce565b826101f8846101be565b905061020381610279565b925060208210156102435761023e7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8360200360080261028e565b831692505b5050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b600061028582516101d9565b80915050919050565b600082821b905092915050565b6101bd806102aa6000396000f3fe608060405234801561001057600080fd5b506004361061002b5760003560e01c8063f566852414610030575b600080fd5b61003861004e565b6040516100459190610146565b60405180910390f35b6000600160009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff166381ca91d36040518163ffffffff1660e01b815260040160206040518083038186803b1580156100b857600080fd5b505afa1580156100cc573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906100f0919061010a565b905090565b60008151905061010481610170565b92915050565b6000602082840312156101205761011f61016b565b5b600061012e848285016100f5565b91505092915050565b61014081610161565b82525050565b600060208201905061015b6000830184610137565b92915050565b6000819050919050565b600080fd5b61017981610161565b811461018457600080fd5b5056fea2646970667358221220065863d77ef2920706d664472b62e5c41f2da9e415f58493964dc51a710a937564736f6c63430008070033608060405234801561001057600080fd5b5060b68061001f6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063ab5ed15014602d575b600080fd5b60336047565b604051603e9190605d565b60405180910390f35b60006001905090565b6057816076565b82525050565b6000602082019050607060008301846050565b92915050565b600081905091905056fea2646970667358221220df91a8df66c4433e0b980f71bc0fd7987cf274d28fa5175d9c60e136f4bef03264736f6c63430008070033608060405234801561001057600080fd5b5060405161020638038061020683398181016040528101906100329190610063565b60018160001c6100429190610090565b60008190555050610145565b60008151905061005d8161012e565b92915050565b60006020828403121561007957610078610129565b5b60006100878482850161004e565b91505092915050565b600061009b826100f0565b91506100a6836100f0565b9250827fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff038211156100db576100da6100fa565b5b828201905092915050565b6000819050919050565b6000819050919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b600080fd5b610137816100e6565b811461014257600080fd5b50565b60b3806101536000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c806381ca91d314602d575b600080fd5b60336047565b604051603e9190605a565b60405180910390f35b60005481565b6054816073565b82525050565b6000602082019050606d6000830184604d565b92915050565b600081905091905056fea26469706673582212209b386e1a4e0efdcce8424e6e058b1e781a1377acbc48c3d3f2db43b08021ef9164736f6c63430008070033")
+
+	config = &params.ChainConfig{
+		ChainID:             big.NewInt(3151908),
+		HomesteadBlock:      big.NewInt(0),
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
+		Ethash:              new(params.EthashConfig),
+		CancunBlock:         big.NewInt(0),
+	}
+	signer     = types.LatestSigner(config)
+	testkey, _ = crypto.HexToECDSA("ef5177cd0b6b21c87db5a0bf35d4084a8a57a9d6a064f86d51ac85f2b873a4e2")
+	from       = crypto.PubkeyToAddress(testkey.PublicKey)
 )
 
 func TestExtCopyInContractDeployment(t *testing.T) {
@@ -139,26 +161,6 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	log.Printf("------------ VERIFIED ALL NODES ARE IN SYNC BEFORE SENDING THE TX ------------")
 
 	log.Printf("------------ SENDING THE CONTRACT DEPLOYMENT TX ------------")
-	// source for this contract can be found at https://gist.github.com/gballet/a23db1e1cb4ed105616b5920feb75985
-	config := &params.ChainConfig{
-		ChainID:             big.NewInt(3151908),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    big.NewInt(0),
-		BerlinBlock:         big.NewInt(0),
-		LondonBlock:         big.NewInt(0),
-		Ethash:              new(params.EthashConfig),
-		CancunBlock:         big.NewInt(0),
-	}
-	signer := types.LatestSigner(config)
-	testkey, _ := crypto.HexToECDSA("ef5177cd0b6b21c87db5a0bf35d4084a8a57a9d6a064f86d51ac85f2b873a4e2")
-	from := crypto.PubkeyToAddress(testkey.PublicKey)
 	client := nodeClientsByServiceIds["el-client-0"]
 	nonce, err := client.PendingNonceAt(ctx, from)
 	if err != nil {
@@ -216,6 +218,93 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	require.NoError(t, err, "Contract deployment was unsuccessful! ")
 
 	log.Printf("----------- VERIFIED THAT CONTRACT DEPLOYMENT PRODUCED THE CORRECT OUTPUT  --------------")
+
+	// Test teardown phase
+	isTestInExecution = false
+	log.Printf("------------ TEST FINISHED ---------------")
+}
+
+// TestReadGenesisTree tests for a bug that was found in Beverly Hills v0.2:
+// the tree that was stored at genesis time was incorrect because the buffer
+// that was used for storing values in the database was reused, and so a single
+// value was inserted many times over. This bug was uncovered when the deposit
+// contract was added to the testnet: the initial deposits were all given to
+// the same address although this isn't what caused the network split: because
+// the value that would be used to compute the commitment was dependent on a
+// map enumeration order, nodes disagreed on the commitment for that leaf node
+// and would report invalid blocks.
+func TestReadGenesisTree(t *testing.T) {
+	isTestInExecution = true
+	moduleParams := initNodeIdsAndRenderModuleParam()
+
+	ctx := context.Background()
+
+	log.Printf("------------ CONNECTING TO KURTOSIS ENGINE ---------------")
+	kurtosisCtx, err := kurtosis_context.NewKurtosisContextFromLocalEngine()
+	require.NoError(t, err, "An error occurred connecting to the Kurtosis engine")
+
+	enclaveId := enclaves.EnclaveID(fmt.Sprintf(
+		"%v-%v",
+		testName, time.Now().Unix(),
+	))
+	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveId, isPartitioningEnabled)
+	require.NoError(t, err, "An error occurred creating the enclave")
+	defer func() {
+		if !isTestInExecution {
+			_ = kurtosisCtx.DestroyEnclave(ctx, enclaveId)
+			_, _ = kurtosisCtx.Clean(ctx, false)
+		}
+	}()
+
+	log.Printf("------------ EXECUTING MODULE ---------------")
+	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, moduleParams, false)
+	require.NoError(t, err, "An error executing loading the ETH module")
+	require.Nil(t, starlarkRunResult.InterpretationError)
+	require.Empty(t, starlarkRunResult.ValidationErrors)
+	require.Nil(t, starlarkRunResult.ExecutionError)
+
+	nodeClientsByServiceIds, err := getElNodeClientsByServiceID(enclaveCtx, idsToQuery)
+	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", idsToQuery)
+
+	log.Printf("------------ STARTING TEST CASE ---------------")
+	stopPrintingFunc, err := printNodeInfoUntilStopped(
+		ctx,
+		nodeClientsByServiceIds,
+	)
+	require.NoError(t, err, "An error occurred launching the node info printer thread")
+	defer stopPrintingFunc()
+
+	log.Printf("------------ CHECKING ALL NODES ARE IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment)
+	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minBlocksBeforeDeployment)
+	require.NoError(t, err, "An error occurred waiting until all nodes get synced before inducing the partition")
+	log.Printf("------------ ALL NODES SYNCED AT BLOCK NUMBER '%v' ------------", syncedBlockNumber)
+	printAllNodesInfo(ctx, nodeClientsByServiceIds)
+	log.Printf("------------ VERIFIED ALL NODES ARE IN SYNC BEFORE SENDING THE TX ------------")
+
+	log.Printf("------------ SENDING A TX THAT RESOLVES THE DEPOSIT CONTRACT LEAF ------------")
+	client := nodeClientsByServiceIds["el-client-0"]
+	nonce, err := client.PendingNonceAt(ctx, from)
+	if err != nil {
+		t.Fatal("could not get nonce")
+	}
+	// Send 1 wei to an account designed to resolve the leaf node in which the account
+	// data was stored.
+	depositleafnoderesolvingaddr := common.HexToAddress("2e1a912c2ba698c9e4c0193f93c598f5800ffc85")
+	tx, _ := types.SignTx(types.NewTransaction(nonce, depositleafnoderesolvingaddr, big.NewInt(1), 600000, big.NewInt(875000000), nil), signer, testkey)
+	err = client.SendTransaction(ctx, tx)
+	if err != nil {
+		t.Fatalf("error sending the transaction: %v", err)
+	}
+
+	log.Printf("------------ CHECKING ALL NODES ARE STILL IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment+minBlocksAfterDeployment)
+	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minBlocksBeforeDeployment+minBlocksAfterDeployment)
+	require.NoError(t, err, "An error occurred waiting until all nodes get synced after inducing the partition")
+	log.Printf("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
+	printAllNodesInfo(ctx, nodeClientsByServiceIds)
+	log.Printf("----------- VERIFIED THAT ALL NODES ARE IN SYNC AFTER DEPLOYING TX --------------")
+
+	// from := common.HexToAddress("0xAb2A01BC351770D09611Ac80f1DE076D56E0487d")
+	log.Printf("----------- VERIFIED THAT THE TX HAS BEEN INCLUDED -------------")
 
 	// Test teardown phase
 	isTestInExecution = false
@@ -292,7 +381,6 @@ func printNodeInfoUntilStopped(
 	}()
 
 	stopFunc := func() {
-		fmt.Println("=== stopping ===")
 		printingStopChan <- struct{}{}
 	}
 
@@ -383,6 +471,11 @@ func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*types.B
 
 	for _, serviceId := range sortedServiceIds {
 		blockInfo := nodeCurrentBlocks[serviceId]
+		// hack, it looks like shutting down the system has some
+		// non-determinism
+		if blockInfo == nil {
+			continue
+		}
 		hash := blockInfo.Hash().Hex()
 		shortHash := hash[:5] + ".." + hash[len(hash)-3:]
 		nodeInfoStr = fmt.Sprintf(nodeInfoStr+"  %05d - %-10s  |", blockInfo.NumberU64(), shortHash)
