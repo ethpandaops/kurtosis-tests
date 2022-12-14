@@ -171,6 +171,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error sending the contract transaction: %v", err)
 	}
+	t.Skip("let's see if the first test causes the second one to fail")
 
 	log.Printf("------------ CHECKING ALL NODES ARE STILL IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment+minBlocksAfterDeployment)
 	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minBlocksBeforeDeployment+minBlocksAfterDeployment)
@@ -247,7 +248,13 @@ func TestReadGenesisTree(t *testing.T) {
 		"%v-%v",
 		testName, time.Now().Unix(),
 	))
-	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveId, isPartitioningEnabled)
+	enclaves, err := kurtosisCtx.GetEnclaves(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(enclaves)
+
+	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveId, false)
 	require.NoError(t, err, "An error occurred creating the enclave")
 	defer func() {
 		if !isTestInExecution {
@@ -258,6 +265,7 @@ func TestReadGenesisTree(t *testing.T) {
 
 	log.Printf("------------ EXECUTING MODULE ---------------")
 	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, moduleParams, false)
+	t.Log(err)
 	require.NoError(t, err, "An error executing loading the ETH module")
 	require.Nil(t, starlarkRunResult.InterpretationError)
 	require.Empty(t, starlarkRunResult.ValidationErrors)
