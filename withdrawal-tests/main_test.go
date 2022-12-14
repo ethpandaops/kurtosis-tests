@@ -3,14 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	eth2client "github.com/attestantio/go-eth2-client"
-	"github.com/attestantio/go-eth2-client/http"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/enclaves"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/services"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/engine/lib/kurtosis_context"
 	"github.com/kurtosis-tech/stacktrace"
+	"github.com/samcm/beacon"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"log"
 	"math/big"
@@ -63,8 +63,8 @@ const (
 	]
 }`
 
-	minBlocksBeforeDeployment = 5
-	minBlocksAfterDeployment  = 400
+	minSlotsBeforeDeployment = 5
+	minSlotsAfterDeployment  = 160
 
 	elNodeIdTemplate          = "el-client-%d"
 	clNodeBeaconIdTemplate    = "cl-client-%d-beacon"
@@ -117,7 +117,9 @@ func TestBasicTestnetFinality(t *testing.T) {
 	nodeELClientsByServiceIds, err := getElNodeClientsByServiceID(enclaveCtx, elIdsToQuery)
 	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", elIdsToQuery)
 
-	nodeCLClientsByServiceIds, err := getCLNodeClientsByServiceID(ctx, enclaveCtx, clIdsToQuery)
+	nodeCLClientsByServiceIds, err := getCLNodeClientsByServiceID(enclaveCtx, clIdsToQuery)
+	printCLNodeInfo(ctx, nodeCLClientsByServiceIds)
+
 	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", clIdsToQuery)
 
 	fmt.Println(nodeCLClientsByServiceIds)
@@ -130,14 +132,14 @@ func TestBasicTestnetFinality(t *testing.T) {
 	require.NoError(t, err, "An error occurred launching the node info printer thread")
 	defer stopPrintingFunc()
 
-	log.Printf("------------ CHECKING ALL NODES ARE IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment)
-	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, elIdsToQuery, nodeELClientsByServiceIds, minBlocksBeforeDeployment)
+	log.Printf("------------ CHECKING ALL NODES ARE IN SYNC AT BLOCK '%d' ---------------", minSlotsBeforeDeployment)
+	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, elIdsToQuery, nodeELClientsByServiceIds, minSlotsBeforeDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced")
 	log.Printf("------------ ALL NODES SYNCED AT BLOCK NUMBER '%v' ------------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeELClientsByServiceIds)
 	log.Printf("------------ VERIFIED ALL NODES ARE IN SYNC ------------")
 
-	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, elIdsToQuery, nodeELClientsByServiceIds, minBlocksBeforeDeployment+minBlocksAfterDeployment)
+	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, elIdsToQuery, nodeELClientsByServiceIds, minSlotsBeforeDeployment+minSlotsAfterDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced after inducing the partition")
 	log.Printf("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeELClientsByServiceIds)
@@ -158,15 +160,36 @@ func initNodeIdsAndRenderModuleParam() string {
 	return strings.ReplaceAll(moduleParamsTemplate, participantsPlaceholder, strings.Join(participantParams, ","))
 }
 
+func printCLNodeInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
+
+	for _, client := range nodeClientsByServiceIds {
+		// Get the node's info
+		// get the spec from the client and handle the error
+		spec, err := client.GetNodeVersion(ctx)
+		if err != nil {
+			log.Fatal("An error occurred getting the spec: ", err)
+		}
+		fmt.Println(spec)
+
+		nodeInfo, err := client.FetchBeaconState(ctx, "head")
+		if err != nil {
+			log.Fatal("An error occurred getting the beaconstate: ", err)
+		}
+		fmt.Printf("Node info: %v", nodeInfo)
+	}
+
+}
+
 func getCLNodeClientsByServiceID(
-	ctx context.Context,
 	enclaveCtx *enclaves.EnclaveContext,
 	serviceIds []services.ServiceID,
 ) (
-	resultNodeClientsByServiceId map[services.ServiceID]*eth2client.Service,
+	resultNodeClientsByServiceId map[services.ServiceID]beacon.Node,
 	resultErr error,
 ) {
-	nodeClientsByServiceIds := map[services.ServiceID]*eth2client.Service{}
+	nodeClientsByServiceIds := map[services.ServiceID]beacon.Node{}
+	config := beacon.Config{}
+
 	for _, serviceId := range serviceIds {
 		serviceCtx, err := enclaveCtx.GetServiceContext(serviceId)
 		if err != nil {
@@ -178,19 +201,19 @@ func getCLNodeClientsByServiceID(
 			return nil, stacktrace.NewError("Service '%v' doesn't have expected RPC port with ID '%v'", serviceId, rpcPortId)
 		}
 
-		client, err := http.New(ctx,
-			// WithAddress supplies the address of the beacon node, as a URL.
-			http.WithAddress(fmt.Sprintf(
-				"http://%v:%v",
-				serviceCtx.GetMaybePublicIPAddress(),
-				rpcPort.GetNumber(),
-			)),
-		)
+		config.Addr = fmt.Sprintf("http://%v:%v", serviceCtx.GetMaybePublicIPAddress(), rpcPort.GetNumber())
+		var logger = logrus.New()
+		opts := *beacon.DefaultOptions().
+			DisableFetchingProposerDuties().
+			DisablePrometheusMetrics()
+
+		client := beacon.NewNode(logger, &config, "eth_con", opts)
+
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "A fatal error occurred creating the ETH client for service '%v'", serviceId)
 		}
 
-		nodeClientsByServiceIds[serviceId] = &client
+		nodeClientsByServiceIds[serviceId] = client
 
 	}
 	return nodeClientsByServiceIds, nil
