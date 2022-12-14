@@ -171,7 +171,6 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error sending the contract transaction: %v", err)
 	}
-	t.Skip("let's see if the first test causes the second one to fail")
 
 	log.Printf("------------ CHECKING ALL NODES ARE STILL IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment+minBlocksAfterDeployment)
 	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minBlocksBeforeDeployment+minBlocksAfterDeployment)
@@ -193,6 +192,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	}
 
 	log.Printf("contract address=%x %v", contractaddr, err)
+	t.Skip("let's see if the first test causes the second one to fail")
 
 	// from := common.HexToAddress("0xAb2A01BC351770D09611Ac80f1DE076D56E0487d")
 	log.Printf("reading code %x %x", contractaddr, from)
