@@ -192,7 +192,6 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	}
 
 	log.Printf("contract address=%x %v", contractaddr, err)
-	t.Skip("let's see if the first test causes the second one to fail")
 
 	// from := common.HexToAddress("0xAb2A01BC351770D09611Ac80f1DE076D56E0487d")
 	log.Printf("reading code %x %x", contractaddr, from)
@@ -213,6 +212,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Skip("let's see if the first test causes the second one to fail")
 	var expectedContractData = common.FromHex("80604052348015600f57600080fd5b506004361060285760003560e01c8063ac")
 
 	err = compareContractData(expectedContractData, receivedContractData)
