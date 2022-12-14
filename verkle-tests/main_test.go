@@ -212,7 +212,6 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Skip("let's see if the first test causes the second one to fail")
 	var expectedContractData = common.FromHex("80604052348015600f57600080fd5b506004361060285760003560e01c8063ac")
 
 	err = compareContractData(expectedContractData, receivedContractData)
@@ -221,6 +220,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	log.Printf("----------- VERIFIED THAT CONTRACT DEPLOYMENT PRODUCED THE CORRECT OUTPUT  --------------")
 
 	// Test teardown phase
+	t.Skip("let's see if the first test causes the second one to fail")
 	isTestInExecution = false
 	log.Printf("------------ TEST FINISHED ---------------")
 }
