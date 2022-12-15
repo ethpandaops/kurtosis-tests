@@ -380,12 +380,14 @@ func printNodeInfoUntilStopped(
 			case <-time.Tick(6 * time.Second):
 				printAllNodesInfo(ctx, nodeClientsByServiceIds)
 			case <-printingStopChan:
-				break
+				fmt.Println("received the stop signal")
+				return
 			}
 		}
 	}()
 
 	stopFunc := func() {
+		fmt.Println("sending the stop signal")
 		printingStopChan <- struct{}{}
 	}
 
