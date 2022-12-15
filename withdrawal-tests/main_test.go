@@ -122,8 +122,6 @@ func TestBasicTestnetFinality(t *testing.T) {
 
 	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", clIdsToQuery)
 
-	fmt.Println(nodeCLClientsByServiceIds)
-
 	log.Printf("------------ STARTING TEST CASE ---------------")
 	stopPrintingFunc, err := printNodeInfoUntilStopped(
 		ctx,
@@ -137,12 +135,14 @@ func TestBasicTestnetFinality(t *testing.T) {
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced")
 	log.Printf("------------ ALL NODES SYNCED AT BLOCK NUMBER '%v' ------------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeELClientsByServiceIds)
+	printCLNodeInfo(ctx, nodeCLClientsByServiceIds)
 	log.Printf("------------ VERIFIED ALL NODES ARE IN SYNC ------------")
 
 	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, elIdsToQuery, nodeELClientsByServiceIds, minSlotsBeforeDeployment+minSlotsAfterDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced after inducing the partition")
 	log.Printf("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeELClientsByServiceIds)
+	printCLNodeInfo(ctx, nodeCLClientsByServiceIds)
 
 	// Test teardown phase
 	isTestInExecution = false
@@ -163,19 +163,17 @@ func initNodeIdsAndRenderModuleParam() string {
 func printCLNodeInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
 
 	for _, client := range nodeClientsByServiceIds {
-		// Get the node's info
-		// get the spec from the client and handle the error
-		spec, err := client.GetNodeVersion(ctx)
-		if err != nil {
-			log.Fatal("An error occurred getting the spec: ", err)
+		// Start the beacon node. Start will wait until the beacon node is ready.
+		if err := client.Start(ctx); err != nil {
+			log.Fatal(err)
 		}
-		fmt.Println(spec)
 
-		nodeInfo, err := client.FetchBeaconState(ctx, "head")
+		block, err := client.FetchBlock(ctx, "head")
 		if err != nil {
-			log.Fatal("An error occurred getting the beaconstate: ", err)
+			log.Fatal(err)
 		}
-		fmt.Printf("Node info: %v", nodeInfo)
+
+		fmt.Println(block)
 	}
 
 }
@@ -207,7 +205,7 @@ func getCLNodeClientsByServiceID(
 			DisableFetchingProposerDuties().
 			DisablePrometheusMetrics()
 
-		client := beacon.NewNode(logger, &config, "eth_con", opts)
+		client := beacon.NewNode(logger, &config, "eth", opts)
 
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "A fatal error occurred creating the ETH client for service '%v'", serviceId)
@@ -267,7 +265,7 @@ func printNodeInfoUntilStopped(
 			case <-time.Tick(6 * time.Second):
 				printAllNodesInfo(ctx, nodeClientsByServiceIds)
 			case <-printingStopChan:
-				break
+				return
 			}
 		}
 	}()
