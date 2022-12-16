@@ -142,7 +142,6 @@ func TestBasicTestnetFinality(t *testing.T) {
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced after inducing the partition")
 	log.Printf("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeELClientsByServiceIds)
-	printCLNodeInfo(ctx, nodeCLClientsByServiceIds)
 
 	// Test teardown phase
 	isTestInExecution = false
