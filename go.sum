@@ -92,6 +92,8 @@ github.com/envoyproxy/go-control-plane v0.9.10-0.20210907150352-cf90f659a021/go.
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
 github.com/ethereum/go-ethereum v1.10.21 h1:5lqsEx92ZaZzRyOqBEXux4/UR06m296RGzN3ol3teJY=
 github.com/ethereum/go-ethereum v1.10.21/go.mod h1:EYFyF19u3ezGLD4RqOkLq+ZCXzYbLoNDdZlMt7kyKFg=
+github.com/ethpandaops/beacon v0.15.0 h1:oxPYZpKEpBueX0B6r5dtt8KAUr1X99DH7whIlAXeywE=
+github.com/ethpandaops/beacon v0.15.0/go.mod h1:fkS2U962xdB6+VwBn+J+DMK8cTgTtzVtjZWtvTKjbuE=
 github.com/ethpandaops/ethwallclock v0.2.0 h1:EeFKtZ7v6TAdn/oAh0xaPujD7N4amjBxrWIByraUfLM=
 github.com/ethpandaops/ethwallclock v0.2.0/go.mod h1:y0Cu+mhGLlem19vnAV2x0hpFS5KZ7oOi2SWYayv9l24=
 github.com/fatih/color v1.10.0/go.mod h1:ELkj/draVOlAH/xkhN6mQ50Qd0MPOk5AAr3maGEBuJM=
@@ -242,6 +244,8 @@ github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221212141152-e3c3d8fce
 github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221212141152-e3c3d8fcee35/go.mod h1:JUV33T4ge3WK08Tip4w6Za1ZewV2a0ksfjpuWUAxslQ=
 github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221214121444-37fb2880efe9 h1:2AuW5fGUoxH8dLoI2KwaWIOHLxAxNNVowPtachKtY9I=
 github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221214121444-37fb2880efe9/go.mod h1:JUV33T4ge3WK08Tip4w6Za1ZewV2a0ksfjpuWUAxslQ=
+github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221215170850-225a4aa740b8 h1:EHqN0Xn5rGjjASkOlEIhhJS9YzG+xTkel+EPlZQLfEU=
+github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221215170850-225a4aa740b8/go.mod h1:JUV33T4ge3WK08Tip4w6Za1ZewV2a0ksfjpuWUAxslQ=
 github.com/kurtosis-tech/stacktrace v0.0.0-20211028211901-1c67a77b5409 h1:YQTATifMUwZEtZYb0LVA7DK2pj8s71iY8rzweuUQ5+g=
 github.com/kurtosis-tech/stacktrace v0.0.0-20211028211901-1c67a77b5409/go.mod h1:y5weVs5d9wXXHcDA1awRxkIhhHC1xxYJN8a7aXnE6S8=
 github.com/leodido/go-urn v1.2.0 h1:hpXL4XnriNwQ/ABnpepYM/1vCLWNDfUNts8dX3xTG6Y=

@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/enclaves"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/services"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/engine/lib/kurtosis_context"
 	"github.com/kurtosis-tech/stacktrace"
-	"github.com/samcm/beacon"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"log"
@@ -174,6 +174,9 @@ func printCLNodeInfo(ctx context.Context, nodeClientsByServiceIds map[services.S
 		}
 
 		fmt.Println(block)
+		if err := client.Stop(ctx); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 }
@@ -201,9 +204,7 @@ func getCLNodeClientsByServiceID(
 
 		config.Addr = fmt.Sprintf("http://%v:%v", serviceCtx.GetMaybePublicIPAddress(), rpcPort.GetNumber())
 		var logger = logrus.New()
-		opts := *beacon.DefaultOptions().
-			DisableFetchingProposerDuties().
-			DisablePrometheusMetrics()
+		opts := *beacon.DefaultOptions().DisablePrometheusMetrics().DisableEmptySlotDetection()
 
 		client := beacon.NewNode(logger, &config, "eth", opts)
 

@@ -10,7 +10,7 @@ require (
 
 require (
 	github.com/attestantio/go-eth2-client v0.14.5
-	github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221214121444-37fb2880efe9
+	github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221215170850-225a4aa740b8
 	github.com/kurtosis-tech/stacktrace v0.0.0-20211028211901-1c67a77b5409
 )
 
@@ -25,6 +25,7 @@ require (
 	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
+	github.com/ethpandaops/beacon v0.15.0 // indirect
 	github.com/ethpandaops/ethwallclock v0.2.0 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/ferranbt/fastssz v0.1.2 // indirect
@@ -55,7 +56,6 @@ require (
 	github.com/r3labs/sse/v2 v2.7.4 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rs/zerolog v1.27.0 // indirect
-	github.com/samcm/beacon v0.12.0 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.5 // indirect
