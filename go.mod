@@ -10,7 +10,7 @@ require (
 
 require (
 	github.com/attestantio/go-eth2-client v0.14.5
-	github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221216155007-0f3a97306700
+	github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221222112527-99bbc9737d89
 	github.com/kurtosis-tech/stacktrace v0.0.0-20211028211901-1c67a77b5409
 )
 

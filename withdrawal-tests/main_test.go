@@ -64,7 +64,7 @@ const (
 }`
 
 	minSlotsBeforeDeployment = 5
-	minSlotsAfterDeployment  = 160
+	minSlotsAfterDeployment  = 15
 
 	elNodeIdTemplate          = "el-client-%d"
 	clNodeBeaconIdTemplate    = "cl-client-%d-beacon"

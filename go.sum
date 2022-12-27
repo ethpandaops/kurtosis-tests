@@ -248,6 +248,8 @@ github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221215170850-225a4aa74
 github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221215170850-225a4aa740b8/go.mod h1:JUV33T4ge3WK08Tip4w6Za1ZewV2a0ksfjpuWUAxslQ=
 github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221216155007-0f3a97306700 h1:Mbz2Rhxq56BNVd6pUClTe8CZ4p4K2jAyQUuLV5wUdbo=
 github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221216155007-0f3a97306700/go.mod h1:JUV33T4ge3WK08Tip4w6Za1ZewV2a0ksfjpuWUAxslQ=
+github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221222112527-99bbc9737d89 h1:z9e7tGk6uSBnAv7uM+2YQ1ozhUkby/WkDC464lqQC7M=
+github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20221222112527-99bbc9737d89/go.mod h1:JUV33T4ge3WK08Tip4w6Za1ZewV2a0ksfjpuWUAxslQ=
 github.com/kurtosis-tech/stacktrace v0.0.0-20211028211901-1c67a77b5409 h1:YQTATifMUwZEtZYb0LVA7DK2pj8s71iY8rzweuUQ5+g=
 github.com/kurtosis-tech/stacktrace v0.0.0-20211028211901-1c67a77b5409/go.mod h1:y5weVs5d9wXXHcDA1awRxkIhhHC1xxYJN8a7aXnE6S8=
 github.com/leodido/go-urn v1.2.0 h1:hpXL4XnriNwQ/ABnpepYM/1vCLWNDfUNts8dX3xTG6Y=
