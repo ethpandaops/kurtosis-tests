@@ -3,7 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/attestantio/go-eth2-client/spec"
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/enclaves"
@@ -13,7 +14,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"log"
-	"math/big"
 	"sort"
 	"strings"
 	"sync"
@@ -114,35 +114,36 @@ func TestBasicTestnetFinality(t *testing.T) {
 	require.Empty(t, starlarkRunResult.ValidationErrors)
 	require.Nil(t, starlarkRunResult.ExecutionError)
 
-	nodeELClientsByServiceIds, err := getElNodeClientsByServiceID(enclaveCtx, elIdsToQuery)
-	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", elIdsToQuery)
+	//nodeELClientsByServiceIds, err := getElNodeClientsByServiceID(enclaveCtx, elIdsToQuery)
+	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", clIdsToQuery)
 
 	nodeCLClientsByServiceIds, err := getCLNodeClientsByServiceID(enclaveCtx, clIdsToQuery)
-	printCLNodeInfo(ctx, nodeCLClientsByServiceIds)
+	SetCLClientState("start", ctx, nodeCLClientsByServiceIds)
+	//printCLNodeInfo(ctx, nodeCLClientsByServiceIds)
 
 	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", clIdsToQuery)
 
 	log.Printf("------------ STARTING TEST CASE ---------------")
 	stopPrintingFunc, err := printNodeInfoUntilStopped(
 		ctx,
-		nodeELClientsByServiceIds,
+		nodeCLClientsByServiceIds,
 	)
 	require.NoError(t, err, "An error occurred launching the node info printer thread")
 	defer stopPrintingFunc()
 
 	log.Printf("------------ CHECKING ALL NODES ARE IN SYNC AT BLOCK '%d' ---------------", minSlotsBeforeDeployment)
-	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, elIdsToQuery, nodeELClientsByServiceIds, minSlotsBeforeDeployment)
+	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, clIdsToQuery, nodeCLClientsByServiceIds, minSlotsBeforeDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced")
 	log.Printf("------------ ALL NODES SYNCED AT BLOCK NUMBER '%v' ------------", syncedBlockNumber)
-	printAllNodesInfo(ctx, nodeELClientsByServiceIds)
-	printCLNodeInfo(ctx, nodeCLClientsByServiceIds)
+	printAllNodesInfo(ctx, nodeCLClientsByServiceIds)
+	//printCLNodeInfo(ctx, nodeCLClientsByServiceIds)
 	log.Printf("------------ VERIFIED ALL NODES ARE IN SYNC ------------")
 
-	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, elIdsToQuery, nodeELClientsByServiceIds, minSlotsBeforeDeployment+minSlotsAfterDeployment)
+	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, clIdsToQuery, nodeCLClientsByServiceIds, minSlotsBeforeDeployment+minSlotsAfterDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced after inducing the partition")
 	log.Printf("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
-	printAllNodesInfo(ctx, nodeELClientsByServiceIds)
-
+	printAllNodesInfo(ctx, nodeCLClientsByServiceIds)
+	SetCLClientState("stop", ctx, nodeCLClientsByServiceIds)
 	// Test teardown phase
 	isTestInExecution = false
 	log.Printf("------------ TEST FINISHED ---------------")
@@ -155,30 +156,42 @@ func initNodeIdsAndRenderModuleParam() string {
 		elIdsToQuery[idx] = renderServiceId(elNodeIdTemplate, nodeIds[idx])
 		clIdsToQuery[idx] = renderServiceId(clNodeBeaconIdTemplate, nodeIds[idx])
 		participantParams[idx] = participantParam
+
 	}
 	return strings.ReplaceAll(moduleParamsTemplate, participantsPlaceholder, strings.Join(participantParams, ","))
 }
 
-func printCLNodeInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
-
-	for _, client := range nodeClientsByServiceIds {
-		// Start the beacon node. Start will wait until the beacon node is ready.
-		if err := client.Start(ctx); err != nil {
-			log.Fatal(err)
+func SetCLClientState(Switch string, ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
+	if Switch == "start" {
+		for _, client := range nodeClientsByServiceIds {
+			// Start the beacon node. Start will wait until the beacon node is ready.
+			if err := client.Start(ctx); err != nil {
+				log.Fatal(err)
+			}
 		}
-
-		block, err := client.FetchBlock(ctx, "head")
-		if err != nil {
-			log.Fatal(err)
+	} else if Switch == "stop" {
+		for _, client := range nodeClientsByServiceIds {
+			// Stop the beacon node.
+			if err := client.Stop(ctx); err != nil {
+				log.Fatal(err)
+			}
 		}
-
-		fmt.Println(block)
-		if err := client.Stop(ctx); err != nil {
-			log.Fatal(err)
-		}
+	} else {
+		log.Fatal("Invalid switch")
 	}
-
 }
+
+//func printCLNodeInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
+//
+//	for _, client := range nodeClientsByServiceIds {
+//		block, err := client.FetchBlock(ctx, "head")
+//		if err != nil {
+//			log.Fatal(err)
+//		}
+//
+//	}
+//
+//}
 
 func getCLNodeClientsByServiceID(
 	enclaveCtx *enclaves.EnclaveContext,
@@ -253,7 +266,7 @@ func getElNodeClientsByServiceID(
 
 func printNodeInfoUntilStopped(
 	ctx context.Context,
-	nodeClientsByServiceIds map[services.ServiceID]*ethclient.Client,
+	nodeClientsByServiceIds map[services.ServiceID]beacon.Node,
 ) (func(), error) {
 
 	printingStopChan := make(chan struct{})
@@ -281,42 +294,20 @@ func printNodeInfoUntilStopped(
 func getMostRecentNodeBlockWithRetries(
 	ctx context.Context,
 	serviceId services.ServiceID,
-	client *ethclient.Client,
-	attempts int,
-	sleep time.Duration,
-) (*types.Block, error) {
+	client beacon.Node,
+) (*spec.VersionedSignedBeaconBlock, error) {
 
-	var resultBlock *types.Block
 	var resultErr error
 
-	blockNumberUint64, err := client.BlockNumber(ctx)
+	block, err := client.FetchBlock(ctx, "head")
 	if err != nil {
-		resultErr = stacktrace.Propagate(err, "%-25sAn error occurred getting the block number", serviceId)
+		resultErr = stacktrace.Propagate(err, "%-25sAn error occurred getting the latest block", serviceId)
 	}
 
-	if resultErr == nil {
-		blockNumberBigint := new(big.Int).SetUint64(blockNumberUint64)
-		resultBlock, err = client.BlockByNumber(ctx, blockNumberBigint)
-		if err != nil {
-			resultErr = stacktrace.Propagate(err, "%-25sAn error occurred getting the latest block", serviceId)
-		}
-		if resultBlock == nil {
-			resultErr = stacktrace.NewError("Something unexpected happened, block mustn't be nil; this is an error in the Geth client")
-		}
-	}
-
-	if resultErr != nil {
-		//Sometimes the client do not find the block, so we do retries
-		if attempts--; attempts > 0 {
-			time.Sleep(sleep)
-			return getMostRecentNodeBlockWithRetries(ctx, serviceId, client, attempts, sleep)
-		}
-	}
-
-	return resultBlock, resultErr
+	return block, resultErr
 }
 
-func printHeader(nodeClientsByServiceIds map[services.ServiceID]*ethclient.Client) {
+func printHeader(nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
 	nodeInfoHeaderStr := nodeInfoPrefix
 	nodeInfoHeaderLine2Str := nodeInfoPrefix
 
@@ -335,10 +326,10 @@ func printHeader(nodeClientsByServiceIds map[services.ServiceID]*ethclient.Clien
 	log.Print(nodeInfoHeaderLine2Str)
 }
 
-func printAllNodesInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]*ethclient.Client) {
-	nodesCurrentBlock := make(map[services.ServiceID]*types.Block, 4)
+func printAllNodesInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
+	nodesCurrentBlock := make(map[services.ServiceID]*spec.VersionedSignedBeaconBlock, 4)
 	for serviceId, client := range nodeClientsByServiceIds {
-		nodeBlock, err := getMostRecentNodeBlockWithRetries(ctx, serviceId, client, retriesAttempts, retriesSleepDuration)
+		nodeBlock, err := getMostRecentNodeBlockWithRetries(ctx, serviceId, client)
 		if err != nil && isTestInExecution {
 			log.Printf("%-25sAn error occurred getting the most recent block, err:\n%v", serviceId, err.Error())
 		}
@@ -347,7 +338,7 @@ func printAllNodesInfo(ctx context.Context, nodeClientsByServiceIds map[services
 	printAllNodesCurrentBlock(nodesCurrentBlock)
 }
 
-func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*types.Block) {
+func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*spec.VersionedSignedBeaconBlock) {
 	if nodeCurrentBlocks == nil {
 		return
 	}
@@ -362,9 +353,13 @@ func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*types.B
 
 	for _, serviceId := range sortedServiceIds {
 		blockInfo := nodeCurrentBlocks[serviceId]
-		hash := blockInfo.Hash().Hex()
-		shortHash := hash[:5] + ".." + hash[len(hash)-3:]
-		nodeInfoStr = fmt.Sprintf(nodeInfoStr+"  %05d - %-10s  |", blockInfo.NumberU64(), shortHash)
+		hash, err := blockInfo.Root()
+		if err != nil {
+			log.Fatal(err)
+		}
+		slot, err := blockInfo.Slot()
+		shortHash := hash.String()[:5] + ".." + hash.String()[len(hash.String())-3:]
+		nodeInfoStr = fmt.Sprintf(nodeInfoStr+"  %05d - %-10s  |", slot, shortHash)
 	}
 	log.Print(nodeInfoStr)
 }
@@ -372,10 +367,10 @@ func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*types.B
 func getMostRecentBlockAndStoreIt(
 	ctx context.Context,
 	serviceId services.ServiceID,
-	serviceClient *ethclient.Client,
+	serviceClient beacon.Node,
 	nodeBlocksByServiceIds *sync.Map,
 ) error {
-	block, err := getMostRecentNodeBlockWithRetries(ctx, serviceId, serviceClient, retriesAttempts, retriesSleepDuration)
+	block, err := getMostRecentNodeBlockWithRetries(ctx, serviceId, serviceClient)
 	if err != nil {
 		return stacktrace.Propagate(err, "An error occurred getting the most recent node block for service '%v'", serviceId)
 	}
@@ -385,10 +380,11 @@ func getMostRecentBlockAndStoreIt(
 	return nil
 }
 
+// TODO Broken function
 func waitUntilAllNodesGetSynced(
 	ctx context.Context,
 	serviceIds []services.ServiceID,
-	nodeClientsByServiceIds map[services.ServiceID]*ethclient.Client,
+	nodeClientsByServiceIds map[services.ServiceID]beacon.Node,
 	minimumBlockNumberConstraint uint64,
 ) (uint64, error) {
 	var wg sync.WaitGroup
@@ -413,8 +409,8 @@ func waitUntilAllNodesGetSynced(
 			}
 			wg.Wait()
 
-			var previousNodeBlockHash string
-			var syncedBlockNumber uint64
+			var previousNodeBlockHash phase0.Root
+			var syncedBlockNumber phase0.Slot
 
 			areAllEqual := true
 
@@ -425,20 +421,23 @@ func waitUntilAllNodesGetSynced(
 					errorChan <- stacktrace.NewError("An error occurred loading the node's block for service with ID '%v'", serviceId)
 					break
 				}
-				nodeBlock := uncastedNodeBlock.(*types.Block)
-				nodeBlockHash := nodeBlock.Hash().Hex()
+				nodeBlock := uncastedNodeBlock.(*spec.VersionedSignedBeaconBlock)
+				nodeBlockHash, err := nodeBlock.Root()
+				if err != nil {
+					stacktrace.Propagate(err, "An error occurred getting the node block hash for service with ID '%v'", serviceId)
+				}
 
-				if previousNodeBlockHash != "" && previousNodeBlockHash != nodeBlockHash {
+				if previousNodeBlockHash.String() != "0x0000000000000000000000000000000000000000000000000000000000000000" && previousNodeBlockHash.String() != nodeBlockHash.String() {
 					areAllEqual = false
 					break
 				}
 
 				previousNodeBlockHash = nodeBlockHash
-				syncedBlockNumber = nodeBlock.NumberU64()
+				syncedBlockNumber, err = nodeBlock.Slot()
 			}
 
-			if areAllEqual && syncedBlockNumber >= minimumBlockNumberConstraint {
-				return syncedBlockNumber, nil
+			if areAllEqual && uint64(syncedBlockNumber) >= minimumBlockNumberConstraint {
+				return uint64(syncedBlockNumber), nil
 			}
 
 		case err := <-errorChan:
