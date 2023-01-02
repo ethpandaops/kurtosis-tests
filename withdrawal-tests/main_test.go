@@ -354,6 +354,7 @@ func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*spec.Ve
 	for _, serviceId := range sortedServiceIds {
 		blockInfo := nodeCurrentBlocks[serviceId]
 		hash, err := blockInfo.Root()
+
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -422,10 +423,24 @@ func waitUntilAllNodesGetSynced(
 					break
 				}
 				nodeBlock := uncastedNodeBlock.(*spec.VersionedSignedBeaconBlock)
-				nodeBlockHash, err := nodeBlock.Root()
+
+				nodeBlockHash, err := nodeBlock.BodyRoot()
 				if err != nil {
 					stacktrace.Propagate(err, "An error occurred getting the node block hash for service with ID '%v'", serviceId)
 				}
+				nodeStateRoot, err := nodeBlock.StateRoot()
+				if err != nil {
+					stacktrace.Propagate(err, "An error occurred getting the node state root for service with ID '%v'", serviceId)
+				}
+
+				nodeRoot, err := nodeBlock.Root()
+				if err != nil {
+					stacktrace.Propagate(err, "An error occurred getting the node hash tree root for service with ID '%v'", serviceId)
+				}
+				fmt.Println(uncastedNodeBlock)
+				fmt.Println("Block Root: ", nodeBlockHash.String())
+				fmt.Println("State Root: ", nodeStateRoot.String())
+				fmt.Println("Node root", nodeRoot.String())
 
 				if previousNodeBlockHash.String() != "0x0000000000000000000000000000000000000000000000000000000000000000" && previousNodeBlockHash.String() != nodeBlockHash.String() {
 					areAllEqual = false
