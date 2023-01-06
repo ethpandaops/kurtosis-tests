@@ -68,8 +68,8 @@ const (
 	]
 }`
 
-	minBlocksBeforeDeployment = 5
-	minBlocksAfterDeployment  = 10
+	minSlotsBeforeDeployment = 5
+	minSlotsAfterDeployment  = 10
 
 	elNodeIdTemplate          = "el-client-%d"
 	clNodeBeaconIdTemplate    = "cl-client-%d-beacon"
@@ -153,8 +153,8 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	require.NoError(t, err, "An error occurred launching the node info printer thread")
 	defer stopPrintingFunc()
 
-	log.Printf("------------ CHECKING ALL NODES ARE IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment)
-	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minBlocksBeforeDeployment)
+	log.Printf("------------ CHECKING ALL NODES ARE IN SYNC AT BLOCK '%d' ---------------", minSlotsBeforeDeployment)
+	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minSlotsBeforeDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced before inducing the partition")
 	log.Printf("------------ ALL NODES SYNCED AT BLOCK NUMBER '%v' ------------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeClientsByServiceIds)
@@ -172,8 +172,8 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 		t.Fatalf("error sending the contract transaction: %v", err)
 	}
 
-	log.Printf("------------ CHECKING ALL NODES ARE STILL IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment+minBlocksAfterDeployment)
-	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minBlocksBeforeDeployment+minBlocksAfterDeployment)
+	log.Printf("------------ CHECKING ALL NODES ARE STILL IN SYNC AT BLOCK '%d' ---------------", minSlotsBeforeDeployment+minSlotsAfterDeployment)
+	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minSlotsBeforeDeployment+minSlotsAfterDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced after inducing the partition")
 	log.Printf("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeClientsByServiceIds)
@@ -274,8 +274,8 @@ func TestReadGenesisTree(t *testing.T) {
 	require.NoError(t, err, "An error occurred launching the node info printer thread")
 	defer stopPrintingFunc()
 
-	log.Printf("------------ CHECKING ALL NODES ARE IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment)
-	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minBlocksBeforeDeployment)
+	log.Printf("------------ CHECKING ALL NODES ARE IN SYNC AT BLOCK '%d' ---------------", minSlotsBeforeDeployment)
+	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minSlotsBeforeDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced before inducing the partition")
 	log.Printf("------------ ALL NODES SYNCED AT BLOCK NUMBER '%v' ------------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeClientsByServiceIds)
@@ -296,8 +296,8 @@ func TestReadGenesisTree(t *testing.T) {
 		t.Fatalf("error sending the transaction: %v", err)
 	}
 
-	log.Printf("------------ CHECKING ALL NODES ARE STILL IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment+minBlocksAfterDeployment)
-	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minBlocksBeforeDeployment+minBlocksAfterDeployment)
+	log.Printf("------------ CHECKING ALL NODES ARE STILL IN SYNC AT BLOCK '%d' ---------------", minSlotsBeforeDeployment+minSlotsAfterDeployment)
+	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minSlotsBeforeDeployment+minSlotsAfterDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced after inducing the partition")
 	log.Printf("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeClientsByServiceIds)

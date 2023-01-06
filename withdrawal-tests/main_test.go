@@ -3,17 +3,18 @@ package main
 import (
 	"context"
 	"fmt"
-	eth2client "github.com/attestantio/go-eth2-client"
-	"github.com/attestantio/go-eth2-client/http"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/attestantio/go-eth2-client/spec"
+	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/enclaves"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/services"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/engine/lib/kurtosis_context"
 	"github.com/kurtosis-tech/stacktrace"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"log"
-	"math/big"
 	"sort"
 	"strings"
 	"sync"
@@ -63,8 +64,8 @@ const (
 	]
 }`
 
-	minBlocksBeforeDeployment = 5
-	minBlocksAfterDeployment  = 400
+	minSlotsBeforeDeployment = 5
+	minSlotsAfterDeployment  = 40
 
 	elNodeIdTemplate          = "el-client-%d"
 	clNodeBeaconIdTemplate    = "cl-client-%d-beacon"
@@ -114,34 +115,36 @@ func TestBasicTestnetFinality(t *testing.T) {
 	require.Empty(t, starlarkRunResult.ValidationErrors)
 	require.Nil(t, starlarkRunResult.ExecutionError)
 
-	nodeELClientsByServiceIds, err := getElNodeClientsByServiceID(enclaveCtx, elIdsToQuery)
-	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", elIdsToQuery)
-
-	nodeCLClientsByServiceIds, err := getCLNodeClientsByServiceID(ctx, enclaveCtx, clIdsToQuery)
+	//nodeELClientsByServiceIds, err := getElNodeClientsByServiceID(enclaveCtx, elIdsToQuery)
 	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", clIdsToQuery)
 
-	fmt.Println(nodeCLClientsByServiceIds)
+	nodeCLClientsByServiceIds, err := getCLNodeClientsByServiceID(enclaveCtx, clIdsToQuery)
+	SetCLClientState("start", ctx, nodeCLClientsByServiceIds)
+	//printCLNodeInfo(ctx, nodeCLClientsByServiceIds)
+
+	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", clIdsToQuery)
 
 	log.Printf("------------ STARTING TEST CASE ---------------")
 	stopPrintingFunc, err := printNodeInfoUntilStopped(
 		ctx,
-		nodeELClientsByServiceIds,
+		nodeCLClientsByServiceIds,
 	)
 	require.NoError(t, err, "An error occurred launching the node info printer thread")
 	defer stopPrintingFunc()
 
-	log.Printf("------------ CHECKING ALL NODES ARE IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment)
-	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, elIdsToQuery, nodeELClientsByServiceIds, minBlocksBeforeDeployment)
+	log.Printf("------------ CHECKING ALL NODES ARE IN SYNC AT BLOCK '%d' ---------------", minSlotsBeforeDeployment)
+	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, clIdsToQuery, nodeCLClientsByServiceIds, minSlotsBeforeDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced")
 	log.Printf("------------ ALL NODES SYNCED AT BLOCK NUMBER '%v' ------------", syncedBlockNumber)
-	printAllNodesInfo(ctx, nodeELClientsByServiceIds)
+	printAllNodesInfo(ctx, nodeCLClientsByServiceIds)
+	//printCLNodeInfo(ctx, nodeCLClientsByServiceIds)
 	log.Printf("------------ VERIFIED ALL NODES ARE IN SYNC ------------")
 
-	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, elIdsToQuery, nodeELClientsByServiceIds, minBlocksBeforeDeployment+minBlocksAfterDeployment)
+	syncedBlockNumber, err = waitUntilAllNodesGetSynced(ctx, clIdsToQuery, nodeCLClientsByServiceIds, minSlotsBeforeDeployment+minSlotsAfterDeployment)
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced after inducing the partition")
 	log.Printf("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
-	printAllNodesInfo(ctx, nodeELClientsByServiceIds)
-
+	printAllNodesInfo(ctx, nodeCLClientsByServiceIds)
+	SetCLClientState("stop", ctx, nodeCLClientsByServiceIds)
 	// Test teardown phase
 	isTestInExecution = false
 	log.Printf("------------ TEST FINISHED ---------------")
@@ -154,19 +157,53 @@ func initNodeIdsAndRenderModuleParam() string {
 		elIdsToQuery[idx] = renderServiceId(elNodeIdTemplate, nodeIds[idx])
 		clIdsToQuery[idx] = renderServiceId(clNodeBeaconIdTemplate, nodeIds[idx])
 		participantParams[idx] = participantParam
+
 	}
 	return strings.ReplaceAll(moduleParamsTemplate, participantsPlaceholder, strings.Join(participantParams, ","))
 }
 
+func SetCLClientState(Switch string, ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
+	if Switch == "start" {
+		for _, client := range nodeClientsByServiceIds {
+			// Start the beacon node. Start will wait until the beacon node is ready.
+			if err := client.Start(ctx); err != nil {
+				log.Fatal(err)
+			}
+		}
+	} else if Switch == "stop" {
+		for _, client := range nodeClientsByServiceIds {
+			// Stop the beacon node.
+			if err := client.Stop(ctx); err != nil {
+				log.Fatal(err)
+			}
+		}
+	} else {
+		log.Fatal("Invalid switch")
+	}
+}
+
+//func printCLNodeInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
+//
+//	for _, client := range nodeClientsByServiceIds {
+//		block, err := client.FetchBlock(ctx, "head")
+//		if err != nil {
+//			log.Fatal(err)
+//		}
+//
+//	}
+//
+//}
+
 func getCLNodeClientsByServiceID(
-	ctx context.Context,
 	enclaveCtx *enclaves.EnclaveContext,
 	serviceIds []services.ServiceID,
 ) (
-	resultNodeClientsByServiceId map[services.ServiceID]*eth2client.Service,
+	resultNodeClientsByServiceId map[services.ServiceID]beacon.Node,
 	resultErr error,
 ) {
-	nodeClientsByServiceIds := map[services.ServiceID]*eth2client.Service{}
+	nodeClientsByServiceIds := map[services.ServiceID]beacon.Node{}
+	config := beacon.Config{}
+
 	for _, serviceId := range serviceIds {
 		serviceCtx, err := enclaveCtx.GetServiceContext(serviceId)
 		if err != nil {
@@ -178,19 +215,17 @@ func getCLNodeClientsByServiceID(
 			return nil, stacktrace.NewError("Service '%v' doesn't have expected RPC port with ID '%v'", serviceId, rpcPortId)
 		}
 
-		client, err := http.New(ctx,
-			// WithAddress supplies the address of the beacon node, as a URL.
-			http.WithAddress(fmt.Sprintf(
-				"http://%v:%v",
-				serviceCtx.GetMaybePublicIPAddress(),
-				rpcPort.GetNumber(),
-			)),
-		)
+		config.Addr = fmt.Sprintf("http://%v:%v", serviceCtx.GetMaybePublicIPAddress(), rpcPort.GetNumber())
+		var logger = logrus.New()
+		opts := *beacon.DefaultOptions().DisablePrometheusMetrics().DisableEmptySlotDetection()
+
+		client := beacon.NewNode(logger, &config, "eth", opts)
+
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "A fatal error occurred creating the ETH client for service '%v'", serviceId)
 		}
 
-		nodeClientsByServiceIds[serviceId] = &client
+		nodeClientsByServiceIds[serviceId] = client
 
 	}
 	return nodeClientsByServiceIds, nil
@@ -232,7 +267,7 @@ func getElNodeClientsByServiceID(
 
 func printNodeInfoUntilStopped(
 	ctx context.Context,
-	nodeClientsByServiceIds map[services.ServiceID]*ethclient.Client,
+	nodeClientsByServiceIds map[services.ServiceID]beacon.Node,
 ) (func(), error) {
 
 	printingStopChan := make(chan struct{})
@@ -244,7 +279,7 @@ func printNodeInfoUntilStopped(
 			case <-time.Tick(6 * time.Second):
 				printAllNodesInfo(ctx, nodeClientsByServiceIds)
 			case <-printingStopChan:
-				break
+				return
 			}
 		}
 	}()
@@ -260,42 +295,44 @@ func printNodeInfoUntilStopped(
 func getMostRecentNodeBlockWithRetries(
 	ctx context.Context,
 	serviceId services.ServiceID,
-	client *ethclient.Client,
-	attempts int,
-	sleep time.Duration,
-) (*types.Block, error) {
+	client beacon.Node,
+) (*spec.VersionedSignedBeaconBlock, error) {
 
-	var resultBlock *types.Block
 	var resultErr error
 
-	blockNumberUint64, err := client.BlockNumber(ctx)
+	block, err := client.FetchBlock(ctx, "head")
 	if err != nil {
-		resultErr = stacktrace.Propagate(err, "%-25sAn error occurred getting the block number", serviceId)
+		resultErr = stacktrace.Propagate(err, "%-25sAn error occurred getting the latest block", serviceId)
 	}
-
-	if resultErr == nil {
-		blockNumberBigint := new(big.Int).SetUint64(blockNumberUint64)
-		resultBlock, err = client.BlockByNumber(ctx, blockNumberBigint)
-		if err != nil {
-			resultErr = stacktrace.Propagate(err, "%-25sAn error occurred getting the latest block", serviceId)
-		}
-		if resultBlock == nil {
-			resultErr = stacktrace.NewError("Something unexpected happened, block mustn't be nil; this is an error in the Geth client")
-		}
+	//fmt.Println("Block version at fetch: ", block.Version)
+	//fmt.Println("Block at fetch: ", block.String())
+	parentRoot, err := block.ParentRoot()
+	if err != nil {
+		resultErr = stacktrace.Propagate(err, "%-25sAn error occurred getting the parent root", serviceId)
 	}
-
-	if resultErr != nil {
-		//Sometimes the client do not find the block, so we do retries
-		if attempts--; attempts > 0 {
-			time.Sleep(sleep)
-			return getMostRecentNodeBlockWithRetries(ctx, serviceId, client, attempts, sleep)
-		}
+	nodeRoot, err := block.Root()
+	if err != nil {
+		stacktrace.Propagate(err, "An error occurred getting the node hash tree root for service with ID '%v'", serviceId)
 	}
+	nodeStateRoot, err := block.StateRoot()
+	if err != nil {
+		stacktrace.Propagate(err, "An error occurred getting the node state root for service with ID '%v'", serviceId)
+	}
+	slotNumber, err := block.Slot()
+	if err != nil {
+		stacktrace.Propagate(err, "An error occurred getting the node hash tree root for service with ID '%v'", serviceId)
+	}
+	fmt.Println("Block root at fetch: ", nodeRoot.String())
+	fmt.Println("Block parent root at fetch: ", parentRoot.String())
+	fmt.Println("Block state root at fetch: ", nodeStateRoot.String())
+	fmt.Println("Block slot at fetch: ", slotNumber)
 
-	return resultBlock, resultErr
+	spew.Dump(block)
+
+	return block, resultErr
 }
 
-func printHeader(nodeClientsByServiceIds map[services.ServiceID]*ethclient.Client) {
+func printHeader(nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
 	nodeInfoHeaderStr := nodeInfoPrefix
 	nodeInfoHeaderLine2Str := nodeInfoPrefix
 
@@ -314,10 +351,10 @@ func printHeader(nodeClientsByServiceIds map[services.ServiceID]*ethclient.Clien
 	log.Print(nodeInfoHeaderLine2Str)
 }
 
-func printAllNodesInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]*ethclient.Client) {
-	nodesCurrentBlock := make(map[services.ServiceID]*types.Block, 4)
+func printAllNodesInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
+	nodesCurrentBlock := make(map[services.ServiceID]*spec.VersionedSignedBeaconBlock, 4)
 	for serviceId, client := range nodeClientsByServiceIds {
-		nodeBlock, err := getMostRecentNodeBlockWithRetries(ctx, serviceId, client, retriesAttempts, retriesSleepDuration)
+		nodeBlock, err := getMostRecentNodeBlockWithRetries(ctx, serviceId, client)
 		if err != nil && isTestInExecution {
 			log.Printf("%-25sAn error occurred getting the most recent block, err:\n%v", serviceId, err.Error())
 		}
@@ -326,7 +363,7 @@ func printAllNodesInfo(ctx context.Context, nodeClientsByServiceIds map[services
 	printAllNodesCurrentBlock(nodesCurrentBlock)
 }
 
-func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*types.Block) {
+func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*spec.VersionedSignedBeaconBlock) {
 	if nodeCurrentBlocks == nil {
 		return
 	}
@@ -341,9 +378,14 @@ func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*types.B
 
 	for _, serviceId := range sortedServiceIds {
 		blockInfo := nodeCurrentBlocks[serviceId]
-		hash := blockInfo.Hash().Hex()
-		shortHash := hash[:5] + ".." + hash[len(hash)-3:]
-		nodeInfoStr = fmt.Sprintf(nodeInfoStr+"  %05d - %-10s  |", blockInfo.NumberU64(), shortHash)
+		hash, err := blockInfo.Root()
+
+		if err != nil {
+			log.Fatal(err)
+		}
+		slot, err := blockInfo.Slot()
+		shortHash := hash.String()[:5] + ".." + hash.String()[len(hash.String())-3:]
+		nodeInfoStr = fmt.Sprintf(nodeInfoStr+"  %05d - %-10s  |", slot, shortHash)
 	}
 	log.Print(nodeInfoStr)
 }
@@ -351,10 +393,10 @@ func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*types.B
 func getMostRecentBlockAndStoreIt(
 	ctx context.Context,
 	serviceId services.ServiceID,
-	serviceClient *ethclient.Client,
+	serviceClient beacon.Node,
 	nodeBlocksByServiceIds *sync.Map,
 ) error {
-	block, err := getMostRecentNodeBlockWithRetries(ctx, serviceId, serviceClient, retriesAttempts, retriesSleepDuration)
+	block, err := getMostRecentNodeBlockWithRetries(ctx, serviceId, serviceClient)
 	if err != nil {
 		return stacktrace.Propagate(err, "An error occurred getting the most recent node block for service '%v'", serviceId)
 	}
@@ -364,10 +406,11 @@ func getMostRecentBlockAndStoreIt(
 	return nil
 }
 
+// TODO Broken function
 func waitUntilAllNodesGetSynced(
 	ctx context.Context,
 	serviceIds []services.ServiceID,
-	nodeClientsByServiceIds map[services.ServiceID]*ethclient.Client,
+	nodeClientsByServiceIds map[services.ServiceID]beacon.Node,
 	minimumBlockNumberConstraint uint64,
 ) (uint64, error) {
 	var wg sync.WaitGroup
@@ -392,8 +435,8 @@ func waitUntilAllNodesGetSynced(
 			}
 			wg.Wait()
 
-			var previousNodeBlockHash string
-			var syncedBlockNumber uint64
+			var previousNodeBlockHash phase0.Root
+			var syncedBlockNumber phase0.Slot
 
 			areAllEqual := true
 
@@ -404,20 +447,37 @@ func waitUntilAllNodesGetSynced(
 					errorChan <- stacktrace.NewError("An error occurred loading the node's block for service with ID '%v'", serviceId)
 					break
 				}
-				nodeBlock := uncastedNodeBlock.(*types.Block)
-				nodeBlockHash := nodeBlock.Hash().Hex()
+				nodeBlock := uncastedNodeBlock.(*spec.VersionedSignedBeaconBlock)
 
-				if previousNodeBlockHash != "" && previousNodeBlockHash != nodeBlockHash {
+				nodeBlockHash, err := nodeBlock.BodyRoot()
+				if err != nil {
+					stacktrace.Propagate(err, "An error occurred getting the node block hash for service with ID '%v'", serviceId)
+				}
+				//nodeStateRoot, err := nodeBlock.StateRoot()
+				//if err != nil {
+				//	stacktrace.Propagate(err, "An error occurred getting the node state root for service with ID '%v'", serviceId)
+				//}
+				//
+				//nodeRoot, err := nodeBlock.Root()
+				//if err != nil {
+				//	stacktrace.Propagate(err, "An error occurred getting the node hash tree root for service with ID '%v'", serviceId)
+				//}
+				//fmt.Println(uncastedNodeBlock)
+				//fmt.Println("Block Root: ", nodeBlockHash.String())
+				//fmt.Println("State Root: ", nodeStateRoot.String())
+				//fmt.Println("Node root", nodeRoot.String())
+
+				if previousNodeBlockHash.String() != "0x0000000000000000000000000000000000000000000000000000000000000000" && previousNodeBlockHash.String() != nodeBlockHash.String() {
 					areAllEqual = false
 					break
 				}
 
 				previousNodeBlockHash = nodeBlockHash
-				syncedBlockNumber = nodeBlock.NumberU64()
+				syncedBlockNumber, err = nodeBlock.Slot()
 			}
 
-			if areAllEqual && syncedBlockNumber >= minimumBlockNumberConstraint {
-				return syncedBlockNumber, nil
+			if areAllEqual && uint64(syncedBlockNumber) >= minimumBlockNumberConstraint {
+				return uint64(syncedBlockNumber), nil
 			}
 
 		case err := <-errorChan:
