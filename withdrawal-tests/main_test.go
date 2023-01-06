@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/attestantio/go-eth2-client/spec"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/enclaves"
@@ -64,7 +65,7 @@ const (
 }`
 
 	minSlotsBeforeDeployment = 5
-	minSlotsAfterDeployment  = 15
+	minSlotsAfterDeployment  = 40
 
 	elNodeIdTemplate          = "el-client-%d"
 	clNodeBeaconIdTemplate    = "cl-client-%d-beacon"
@@ -303,6 +304,30 @@ func getMostRecentNodeBlockWithRetries(
 	if err != nil {
 		resultErr = stacktrace.Propagate(err, "%-25sAn error occurred getting the latest block", serviceId)
 	}
+	//fmt.Println("Block version at fetch: ", block.Version)
+	//fmt.Println("Block at fetch: ", block.String())
+	parentRoot, err := block.ParentRoot()
+	if err != nil {
+		resultErr = stacktrace.Propagate(err, "%-25sAn error occurred getting the parent root", serviceId)
+	}
+	nodeRoot, err := block.Root()
+	if err != nil {
+		stacktrace.Propagate(err, "An error occurred getting the node hash tree root for service with ID '%v'", serviceId)
+	}
+	nodeStateRoot, err := block.StateRoot()
+	if err != nil {
+		stacktrace.Propagate(err, "An error occurred getting the node state root for service with ID '%v'", serviceId)
+	}
+	slotNumber, err := block.Slot()
+	if err != nil {
+		stacktrace.Propagate(err, "An error occurred getting the node hash tree root for service with ID '%v'", serviceId)
+	}
+	fmt.Println("Block root at fetch: ", nodeRoot.String())
+	fmt.Println("Block parent root at fetch: ", parentRoot.String())
+	fmt.Println("Block state root at fetch: ", nodeStateRoot.String())
+	fmt.Println("Block slot at fetch: ", slotNumber)
+
+	spew.Dump(block)
 
 	return block, resultErr
 }
@@ -428,19 +453,19 @@ func waitUntilAllNodesGetSynced(
 				if err != nil {
 					stacktrace.Propagate(err, "An error occurred getting the node block hash for service with ID '%v'", serviceId)
 				}
-				nodeStateRoot, err := nodeBlock.StateRoot()
-				if err != nil {
-					stacktrace.Propagate(err, "An error occurred getting the node state root for service with ID '%v'", serviceId)
-				}
-
-				nodeRoot, err := nodeBlock.Root()
-				if err != nil {
-					stacktrace.Propagate(err, "An error occurred getting the node hash tree root for service with ID '%v'", serviceId)
-				}
-				fmt.Println(uncastedNodeBlock)
-				fmt.Println("Block Root: ", nodeBlockHash.String())
-				fmt.Println("State Root: ", nodeStateRoot.String())
-				fmt.Println("Node root", nodeRoot.String())
+				//nodeStateRoot, err := nodeBlock.StateRoot()
+				//if err != nil {
+				//	stacktrace.Propagate(err, "An error occurred getting the node state root for service with ID '%v'", serviceId)
+				//}
+				//
+				//nodeRoot, err := nodeBlock.Root()
+				//if err != nil {
+				//	stacktrace.Propagate(err, "An error occurred getting the node hash tree root for service with ID '%v'", serviceId)
+				//}
+				//fmt.Println(uncastedNodeBlock)
+				//fmt.Println("Block Root: ", nodeBlockHash.String())
+				//fmt.Println("State Root: ", nodeStateRoot.String())
+				//fmt.Println("Node root", nodeRoot.String())
 
 				if previousNodeBlockHash.String() != "0x0000000000000000000000000000000000000000000000000000000000000000" && previousNodeBlockHash.String() != nodeBlockHash.String() {
 					areAllEqual = false
