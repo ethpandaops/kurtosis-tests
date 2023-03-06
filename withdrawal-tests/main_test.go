@@ -3,18 +3,20 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/attestantio/go-eth2-client/spec"
-	"github.com/attestantio/go-eth2-client/spec/phase0"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethpandaops/beacon/pkg/beacon"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/enclaves"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/services"
 	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/engine/lib/kurtosis_context"
 	"github.com/kurtosis-tech/stacktrace"
-	"github.com/sirupsen/logrus"
+	"github.com/protolambda/eth2api"
+	"github.com/protolambda/eth2api/client/beaconapi"
+	"github.com/protolambda/zrnt/eth2/beacon/common"
+	"github.com/protolambda/zrnt/eth2/configs"
 	"github.com/stretchr/testify/require"
 	"log"
+	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -46,7 +48,7 @@ const (
 	participantsPlaceholder = "{{participants_param}}"
 	//TODO: Replace with image pulled from commit ref
 	//participantParam        = `{"elType":"geth","elImage":"ethereum/client-go:v1.10.25","clType":"lodestar","clImage":"chainsafe/lodestar:v1.1.0"}`
-	participantParam = `{"el_client_type":"geth","el_client_image":"ethereum/client-go:v1.10.26","cl_client_type":"lighthouse","cl_client_image":"sigp/lighthouse:v3.3.0"}`
+	participantParam = `{"el_client_type":"geth","el_client_image":"ethereum/client-go:v1.11.2","cl_client_type":"lighthouse","cl_client_image":"sigp/lighthouse:v3.5.0"}`
 	// Sets parameters to run the kurtosis module with
 	// launch_additional_services decides if grafana, forkmon and other additional servies are launched
 	// participants sets the included clients
@@ -65,7 +67,7 @@ const (
 }`
 
 	minSlotsBeforeDeployment = 5
-	minSlotsAfterDeployment  = 40
+	minSlotsAfterDeployment  = 5
 
 	elNodeIdTemplate          = "el-client-%d"
 	clNodeBeaconIdTemplate    = "cl-client-%d-beacon"
@@ -79,8 +81,8 @@ const (
 
 var (
 	nodeIds           = make([]int, numParticipants)
-	elIdsToQuery      = make([]services.ServiceID, numParticipants)
-	clIdsToQuery      = make([]services.ServiceID, numParticipants)
+	elIdsToQuery      = make([]services.ServiceUUID, numParticipants)
+	clIdsToQuery      = make([]services.ServiceUUID, numParticipants)
 	isTestInExecution bool
 )
 
@@ -95,10 +97,10 @@ func TestBasicTestnetFinality(t *testing.T) {
 	kurtosisCtx, err := kurtosis_context.NewKurtosisContextFromLocalEngine()
 	require.NoError(t, err, "An error occurred connecting to the Kurtosis engine")
 
-	enclaveId := enclaves.EnclaveID(fmt.Sprintf(
+	enclaveId := fmt.Sprintf(
 		"%v-%v",
 		testName, time.Now().Unix(),
-	))
+	)
 	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveId, isPartitioningEnabled)
 	require.NoError(t, err, "An error occurred creating the enclave")
 	defer func() {
@@ -109,18 +111,15 @@ func TestBasicTestnetFinality(t *testing.T) {
 	}()
 
 	log.Printf("------------ EXECUTING MODULE ---------------")
-	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, moduleParams, false)
+	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, moduleParams, false, 0)
 	require.NoError(t, err, "An error executing loading the ETH module")
 	require.Nil(t, starlarkRunResult.InterpretationError)
 	require.Empty(t, starlarkRunResult.ValidationErrors)
 	require.Nil(t, starlarkRunResult.ExecutionError)
 
-	//nodeELClientsByServiceIds, err := getElNodeClientsByServiceID(enclaveCtx, elIdsToQuery)
 	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", clIdsToQuery)
 
 	nodeCLClientsByServiceIds, err := getCLNodeClientsByServiceID(enclaveCtx, clIdsToQuery)
-	SetCLClientState("start", ctx, nodeCLClientsByServiceIds)
-	//printCLNodeInfo(ctx, nodeCLClientsByServiceIds)
 
 	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", clIdsToQuery)
 
@@ -144,7 +143,7 @@ func TestBasicTestnetFinality(t *testing.T) {
 	require.NoError(t, err, "An error occurred waiting until all nodes get synced after inducing the partition")
 	log.Printf("----------- ALL NODES SYNCED AT BLOCK NUMBER '%v' -----------", syncedBlockNumber)
 	printAllNodesInfo(ctx, nodeCLClientsByServiceIds)
-	SetCLClientState("stop", ctx, nodeCLClientsByServiceIds)
+
 	// Test teardown phase
 	isTestInExecution = false
 	log.Printf("------------ TEST FINISHED ---------------")
@@ -162,50 +161,18 @@ func initNodeIdsAndRenderModuleParam() string {
 	return strings.ReplaceAll(moduleParamsTemplate, participantsPlaceholder, strings.Join(participantParams, ","))
 }
 
-func SetCLClientState(Switch string, ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
-	if Switch == "start" {
-		for _, client := range nodeClientsByServiceIds {
-			// Start the beacon node. Start will wait until the beacon node is ready.
-			if err := client.Start(ctx); err != nil {
-				log.Fatal(err)
-			}
-		}
-	} else if Switch == "stop" {
-		for _, client := range nodeClientsByServiceIds {
-			// Stop the beacon node.
-			if err := client.Stop(ctx); err != nil {
-				log.Fatal(err)
-			}
-		}
-	} else {
-		log.Fatal("Invalid switch")
-	}
-}
-
-//func printCLNodeInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
-//
-//	for _, client := range nodeClientsByServiceIds {
-//		block, err := client.FetchBlock(ctx, "head")
-//		if err != nil {
-//			log.Fatal(err)
-//		}
-//
-//	}
-//
-//}
-
 func getCLNodeClientsByServiceID(
 	enclaveCtx *enclaves.EnclaveContext,
-	serviceIds []services.ServiceID,
+	serviceIds []services.ServiceUUID,
 ) (
-	resultNodeClientsByServiceId map[services.ServiceID]beacon.Node,
+	resultNodeClientsByServiceId map[services.ServiceUUID]eth2api.Eth2HttpClient,
 	resultErr error,
 ) {
-	nodeClientsByServiceIds := map[services.ServiceID]beacon.Node{}
+	nodeClientsByServiceIds := map[services.ServiceUUID]eth2api.Eth2HttpClient{}
 	config := beacon.Config{}
 
 	for _, serviceId := range serviceIds {
-		serviceCtx, err := enclaveCtx.GetServiceContext(serviceId)
+		serviceCtx, err := enclaveCtx.GetServiceContext(string(serviceId))
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "A fatal error occurred getting context for service '%v'", serviceId)
 		}
@@ -216,16 +183,23 @@ func getCLNodeClientsByServiceID(
 		}
 
 		config.Addr = fmt.Sprintf("http://%v:%v", serviceCtx.GetMaybePublicIPAddress(), rpcPort.GetNumber())
-		var logger = logrus.New()
-		opts := *beacon.DefaultOptions().DisablePrometheusMetrics().DisableEmptySlotDetection()
 
-		client := beacon.NewNode(logger, &config, "eth", opts)
+		client := &eth2api.Eth2HttpClient{
+			Addr: config.Addr,
+			Cli: &http.Client{
+				Transport: &http.Transport{
+					MaxIdleConnsPerHost: 123,
+				},
+				Timeout: 10 * time.Second,
+			},
+			Codec: eth2api.JSONCodec{},
+		}
 
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "A fatal error occurred creating the ETH client for service '%v'", serviceId)
 		}
 
-		nodeClientsByServiceIds[serviceId] = client
+		nodeClientsByServiceIds[serviceId] = *client
 
 	}
 	return nodeClientsByServiceIds, nil
@@ -233,14 +207,14 @@ func getCLNodeClientsByServiceID(
 
 func getElNodeClientsByServiceID(
 	enclaveCtx *enclaves.EnclaveContext,
-	serviceIds []services.ServiceID,
+	serviceIds []services.ServiceUUID,
 ) (
-	resultNodeClientsByServiceId map[services.ServiceID]*ethclient.Client,
+	resultNodeClientsByServiceId map[services.ServiceUUID]*ethclient.Client,
 	resultErr error,
 ) {
-	nodeClientsByServiceIds := map[services.ServiceID]*ethclient.Client{}
+	nodeClientsByServiceIds := map[services.ServiceUUID]*ethclient.Client{}
 	for _, serviceId := range serviceIds {
-		serviceCtx, err := enclaveCtx.GetServiceContext(serviceId)
+		serviceCtx, err := enclaveCtx.GetServiceContext(string(serviceId))
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "A fatal error occurred getting context for service '%v'", serviceId)
 		}
@@ -267,7 +241,7 @@ func getElNodeClientsByServiceID(
 
 func printNodeInfoUntilStopped(
 	ctx context.Context,
-	nodeClientsByServiceIds map[services.ServiceID]beacon.Node,
+	nodeClientsByServiceIds map[services.ServiceUUID]eth2api.Eth2HttpClient,
 ) (func(), error) {
 
 	printingStopChan := make(chan struct{})
@@ -292,51 +266,43 @@ func printNodeInfoUntilStopped(
 	return stopFunc, nil
 }
 
-func getMostRecentNodeBlockWithRetries(
-	ctx context.Context,
-	serviceId services.ServiceID,
-	client beacon.Node,
-) (*spec.VersionedSignedBeaconBlock, error) {
+func getMostRecentNodeBlockWithRetries(ctx context.Context, client eth2api.Eth2HttpClient) (*common.BeaconBlockEnvelope, error) {
 
 	var resultErr error
+	var block eth2api.VersionedSignedBeaconBlock
+	var blockEnvelope *common.BeaconBlockEnvelope
 
-	block, err := client.FetchBlock(ctx, "head")
-	if err != nil {
-		resultErr = stacktrace.Propagate(err, "%-25sAn error occurred getting the latest block", serviceId)
+	var genesis eth2api.GenesisResponse
+	if exists, err := beaconapi.Genesis(ctx, &client, &genesis); !exists {
+		fmt.Println("chain did not start yet")
+		os.Exit(1)
+	} else if err != nil {
+		fmt.Println("failed to get genesis", err)
+		os.Exit(1)
 	}
-	//fmt.Println("Block version at fetch: ", block.Version)
-	//fmt.Println("Block at fetch: ", block.String())
-	parentRoot, err := block.ParentRoot()
-	if err != nil {
-		resultErr = stacktrace.Propagate(err, "%-25sAn error occurred getting the parent root", serviceId)
-	}
-	nodeRoot, err := block.Root()
-	if err != nil {
-		stacktrace.Propagate(err, "An error occurred getting the node hash tree root for service with ID '%v'", serviceId)
-	}
-	nodeStateRoot, err := block.StateRoot()
-	if err != nil {
-		stacktrace.Propagate(err, "An error occurred getting the node state root for service with ID '%v'", serviceId)
-	}
-	slotNumber, err := block.Slot()
-	if err != nil {
-		stacktrace.Propagate(err, "An error occurred getting the node hash tree root for service with ID '%v'", serviceId)
-	}
-	fmt.Println("Block root at fetch: ", nodeRoot.String())
-	fmt.Println("Block parent root at fetch: ", parentRoot.String())
-	fmt.Println("Block state root at fetch: ", nodeStateRoot.String())
-	fmt.Println("Block slot at fetch: ", slotNumber)
+	spec := configs.Mainnet
+	bellatrixForkDigest := common.ComputeForkDigest(spec.ALTAIR_FORK_VERSION, genesis.GenesisValidatorsRoot)
 
-	spew.Dump(block)
+	if exists, err := beaconapi.BlockV2(ctx, &client, eth2api.BlockHead, &block); !exists {
+		fmt.Println("block not found")
+		os.Exit(1)
+	} else if err != nil {
+		fmt.Println("failed to get block", err)
+		os.Exit(1)
+	} else {
 
-	return block, resultErr
+		// add digest:
+		blockEnvelope = block.Data.Envelope(spec, bellatrixForkDigest)
+	}
+
+	return blockEnvelope, resultErr
 }
 
-func printHeader(nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
+func printHeader(nodeClientsByServiceIds map[services.ServiceUUID]eth2api.Eth2HttpClient) {
 	nodeInfoHeaderStr := nodeInfoPrefix
 	nodeInfoHeaderLine2Str := nodeInfoPrefix
 
-	sortedServiceIds := make([]services.ServiceID, 0, len(nodeClientsByServiceIds))
+	sortedServiceIds := make([]services.ServiceUUID, 0, len(nodeClientsByServiceIds))
 	for serviceId := range nodeClientsByServiceIds {
 		sortedServiceIds = append(sortedServiceIds, serviceId)
 	}
@@ -351,10 +317,10 @@ func printHeader(nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
 	log.Print(nodeInfoHeaderLine2Str)
 }
 
-func printAllNodesInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]beacon.Node) {
-	nodesCurrentBlock := make(map[services.ServiceID]*spec.VersionedSignedBeaconBlock, 4)
+func printAllNodesInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceUUID]eth2api.Eth2HttpClient) {
+	nodesCurrentBlock := make(map[services.ServiceUUID]*common.BeaconBlockEnvelope, 4)
 	for serviceId, client := range nodeClientsByServiceIds {
-		nodeBlock, err := getMostRecentNodeBlockWithRetries(ctx, serviceId, client)
+		nodeBlock, err := getMostRecentNodeBlockWithRetries(ctx, client)
 		if err != nil && isTestInExecution {
 			log.Printf("%-25sAn error occurred getting the most recent block, err:\n%v", serviceId, err.Error())
 		}
@@ -363,12 +329,12 @@ func printAllNodesInfo(ctx context.Context, nodeClientsByServiceIds map[services
 	printAllNodesCurrentBlock(nodesCurrentBlock)
 }
 
-func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*spec.VersionedSignedBeaconBlock) {
+func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceUUID]*common.BeaconBlockEnvelope) {
 	if nodeCurrentBlocks == nil {
 		return
 	}
 	nodeInfoStr := nodeInfoPrefix
-	sortedServiceIds := make([]services.ServiceID, 0, len(nodeCurrentBlocks))
+	sortedServiceIds := make([]services.ServiceUUID, 0, len(nodeCurrentBlocks))
 	for serviceId := range nodeCurrentBlocks {
 		sortedServiceIds = append(sortedServiceIds, serviceId)
 	}
@@ -378,12 +344,9 @@ func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*spec.Ve
 
 	for _, serviceId := range sortedServiceIds {
 		blockInfo := nodeCurrentBlocks[serviceId]
-		hash, err := blockInfo.Root()
-
-		if err != nil {
-			log.Fatal(err)
-		}
-		slot, err := blockInfo.Slot()
+		hash := blockInfo.BlockRoot
+		//fmt.Println(blockInfo.Slot)
+		slot := blockInfo.Slot
 		shortHash := hash.String()[:5] + ".." + hash.String()[len(hash.String())-3:]
 		nodeInfoStr = fmt.Sprintf(nodeInfoStr+"  %05d - %-10s  |", slot, shortHash)
 	}
@@ -392,11 +355,11 @@ func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*spec.Ve
 
 func getMostRecentBlockAndStoreIt(
 	ctx context.Context,
-	serviceId services.ServiceID,
-	serviceClient beacon.Node,
+	serviceId services.ServiceUUID,
+	serviceClient eth2api.Eth2HttpClient,
 	nodeBlocksByServiceIds *sync.Map,
 ) error {
-	block, err := getMostRecentNodeBlockWithRetries(ctx, serviceId, serviceClient)
+	block, err := getMostRecentNodeBlockWithRetries(ctx, serviceClient)
 	if err != nil {
 		return stacktrace.Propagate(err, "An error occurred getting the most recent node block for service '%v'", serviceId)
 	}
@@ -406,11 +369,10 @@ func getMostRecentBlockAndStoreIt(
 	return nil
 }
 
-// TODO Broken function
 func waitUntilAllNodesGetSynced(
 	ctx context.Context,
-	serviceIds []services.ServiceID,
-	nodeClientsByServiceIds map[services.ServiceID]beacon.Node,
+	serviceIds []services.ServiceUUID,
+	nodeClientsByServiceIds map[services.ServiceUUID]eth2api.Eth2HttpClient,
 	minimumBlockNumberConstraint uint64,
 ) (uint64, error) {
 	var wg sync.WaitGroup
@@ -435,8 +397,8 @@ func waitUntilAllNodesGetSynced(
 			}
 			wg.Wait()
 
-			var previousNodeBlockHash phase0.Root
-			var syncedBlockNumber phase0.Slot
+			var previousNodeBlockHash common.Root
+			var syncedBlockNumber common.Slot
 
 			areAllEqual := true
 
@@ -447,33 +409,18 @@ func waitUntilAllNodesGetSynced(
 					errorChan <- stacktrace.NewError("An error occurred loading the node's block for service with ID '%v'", serviceId)
 					break
 				}
-				nodeBlock := uncastedNodeBlock.(*spec.VersionedSignedBeaconBlock)
 
-				nodeBlockHash, err := nodeBlock.BodyRoot()
-				if err != nil {
-					stacktrace.Propagate(err, "An error occurred getting the node block hash for service with ID '%v'", serviceId)
-				}
-				//nodeStateRoot, err := nodeBlock.StateRoot()
-				//if err != nil {
-				//	stacktrace.Propagate(err, "An error occurred getting the node state root for service with ID '%v'", serviceId)
-				//}
-				//
-				//nodeRoot, err := nodeBlock.Root()
-				//if err != nil {
-				//	stacktrace.Propagate(err, "An error occurred getting the node hash tree root for service with ID '%v'", serviceId)
-				//}
-				//fmt.Println(uncastedNodeBlock)
-				//fmt.Println("Block Root: ", nodeBlockHash.String())
-				//fmt.Println("State Root: ", nodeStateRoot.String())
-				//fmt.Println("Node root", nodeRoot.String())
+				nodeBlock := uncastedNodeBlock.(*common.BeaconBlockEnvelope)
 
-				if previousNodeBlockHash.String() != "0x0000000000000000000000000000000000000000000000000000000000000000" && previousNodeBlockHash.String() != nodeBlockHash.String() {
+				nodeBlockRoot := nodeBlock.BlockRoot
+
+				if previousNodeBlockHash.String() != "0x0000000000000000000000000000000000000000000000000000000000000000" && previousNodeBlockHash.String() != nodeBlockRoot.String() {
 					areAllEqual = false
 					break
 				}
 
-				previousNodeBlockHash = nodeBlockHash
-				syncedBlockNumber, err = nodeBlock.Slot()
+				previousNodeBlockHash = nodeBlockRoot
+				syncedBlockNumber = nodeBlock.Slot
 			}
 
 			if areAllEqual && uint64(syncedBlockNumber) >= minimumBlockNumberConstraint {
@@ -489,6 +436,6 @@ func waitUntilAllNodesGetSynced(
 	}
 }
 
-func renderServiceId(template string, nodeId int) services.ServiceID {
-	return services.ServiceID(fmt.Sprintf(template, nodeId))
+func renderServiceId(template string, nodeId int) services.ServiceUUID {
+	return services.ServiceUUID(fmt.Sprintf(template, nodeId))
 }
