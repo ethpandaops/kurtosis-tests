@@ -61,11 +61,10 @@ const (
 	"participants": [
 		` + participantsPlaceholder + `
 	],
-	"network_params": [
+	"network_params":
 		{	"network_id": "3151908", 
 			"preregistered_validator_keys_mnemonic": "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
 		}
-	]
 }`
 
 	minSlotsBeforeDeployment = 5
