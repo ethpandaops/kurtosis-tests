@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethpandaops/beacon/pkg/beacon"
-	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/enclaves"
-	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/services"
-	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/engine/lib/kurtosis_context"
+	"github.com/kurtosis-tech/kurtosis/api/golang/core/lib/enclaves"
+	"github.com/kurtosis-tech/kurtosis/api/golang/core/lib/services"
+	"github.com/kurtosis-tech/kurtosis/api/golang/engine/lib/kurtosis_context"
 	"github.com/kurtosis-tech/stacktrace"
 	"github.com/protolambda/eth2api"
 	"github.com/protolambda/eth2api/client/beaconapi"
@@ -97,15 +97,15 @@ func TestBasicTestnetFinality(t *testing.T) {
 	kurtosisCtx, err := kurtosis_context.NewKurtosisContextFromLocalEngine()
 	require.NoError(t, err, "An error occurred connecting to the Kurtosis engine")
 
-	enclaveId := fmt.Sprintf(
+	enclaveName := fmt.Sprintf(
 		"%v-%v",
 		testName, time.Now().Unix(),
 	)
-	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveId, isPartitioningEnabled)
+	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveName, isPartitioningEnabled)
 	require.NoError(t, err, "An error occurred creating the enclave")
 	defer func() {
 		if !isTestInExecution {
-			_ = kurtosisCtx.DestroyEnclave(ctx, enclaveId)
+			_ = kurtosisCtx.DestroyEnclave(ctx, enclaveName)
 			_, _ = kurtosisCtx.Clean(ctx, false)
 		}
 	}()
@@ -119,7 +119,7 @@ func TestBasicTestnetFinality(t *testing.T) {
 
 	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", clIdsToQuery)
 
-	nodeCLClientsByServiceIds, err := getCLNodeClientsByServiceID(enclaveCtx, clIdsToQuery)
+	nodeCLClientsByServiceIds, err := getCLNodeClientsByServiceName(enclaveCtx, clIdsToQuery)
 
 	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", clIdsToQuery)
 
@@ -161,7 +161,7 @@ func initNodeIdsAndRenderModuleParam() string {
 	return strings.ReplaceAll(moduleParamsTemplate, participantsPlaceholder, strings.Join(participantParams, ","))
 }
 
-func getCLNodeClientsByServiceID(
+func getCLNodeClientsByServiceName(
 	enclaveCtx *enclaves.EnclaveContext,
 	serviceIds []services.ServiceUUID,
 ) (
@@ -205,7 +205,7 @@ func getCLNodeClientsByServiceID(
 	return nodeClientsByServiceIds, nil
 }
 
-func getElNodeClientsByServiceID(
+func getElNodeClientsByServiceName(
 	enclaveCtx *enclaves.EnclaveContext,
 	serviceIds []services.ServiceUUID,
 ) (

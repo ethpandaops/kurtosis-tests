@@ -9,9 +9,8 @@ require (
 )
 
 require (
-	github.com/attestantio/go-eth2-client v0.15.7
 	github.com/ethpandaops/beacon v0.21.0
-	github.com/kurtosis-tech/kurtosis-sdk/api/golang v0.0.0-20230228131135-408ef1a5d44e
+	github.com/kurtosis-tech/kurtosis/api/golang v0.73.0
 	github.com/kurtosis-tech/stacktrace v0.0.0-20211028211901-1c67a77b5409
 	github.com/protolambda/eth2api v0.0.0-20220822011642-f7735dd471e0
 	github.com/protolambda/zrnt v0.30.0
@@ -19,13 +18,12 @@ require (
 
 require (
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
-	github.com/StackExchange/wmi v1.2.1 // indirect
+	github.com/attestantio/go-eth2-client v0.15.7 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chuckpreslar/emission v0.0.0-20170206194824-a7ddd980baf9 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/deckarep/golang-set/v2 v2.2.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
@@ -44,6 +42,7 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
 	github.com/kilic/bls12-381 v0.1.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
+	github.com/kurtosis-tech/kurtosis-portal/api/golang v0.0.0-20230328194643-b4dea3081e25 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
@@ -81,7 +80,6 @@ require (
 	google.golang.org/grpc v1.53.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
-	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

@@ -18,9 +18,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/enclaves"
-	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/core/lib/services"
-	"github.com/kurtosis-tech/kurtosis-sdk/api/golang/engine/lib/kurtosis_context"
+	"github.com/kurtosis-tech/kurtosis/api/golang/core/lib/enclaves"
+	"github.com/kurtosis-tech/kurtosis/api/golang/core/lib/services"
+	"github.com/kurtosis-tech/kurtosis/api/golang/engine/lib/kurtosis_context"
 	"github.com/kurtosis-tech/stacktrace"
 	"github.com/stretchr/testify/require"
 )
@@ -79,11 +79,13 @@ const (
 
 	retriesAttempts      = 20
 	retriesSleepDuration = 10 * time.Millisecond
+
+	defaultParallelism = 4
 )
 
 var (
 	nodeIds    = make([]int, numParticipants)
-	idsToQuery = make([]services.ServiceID, numParticipants)
+	idsToQuery = make([]services.ServiceName, numParticipants)
 
 	isTestInExecution bool
 
@@ -105,7 +107,6 @@ var (
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
 		Ethash:              new(params.EthashConfig),
-		CancunBlock:         big.NewInt(0),
 	}
 	signer     = types.LatestSigner(config)
 	testkey, _ = crypto.HexToECDSA("ef5177cd0b6b21c87db5a0bf35d4084a8a57a9d6a064f86d51ac85f2b873a4e2")
@@ -122,27 +123,27 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	kurtosisCtx, err := kurtosis_context.NewKurtosisContextFromLocalEngine()
 	require.NoError(t, err, "An error occurred connecting to the Kurtosis engine")
 
-	enclaveId := enclaves.EnclaveID(fmt.Sprintf(
+	enclaveName := fmt.Sprintf(
 		"%v-%v",
 		testName, time.Now().Unix(),
-	))
-	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveId, isPartitioningEnabled)
+	)
+	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveName, isPartitioningEnabled)
 	require.NoError(t, err, "An error occurred creating the enclave")
 	defer func() {
 		if !isTestInExecution {
-			_ = kurtosisCtx.DestroyEnclave(ctx, enclaveId)
+			_ = kurtosisCtx.DestroyEnclave(ctx, enclaveName)
 			_, _ = kurtosisCtx.Clean(ctx, false)
 		}
 	}()
 
 	log.Printf("------------ EXECUTING MODULE ---------------")
-	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, moduleParams, false)
+	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, moduleParams, false, defaultParallelism)
 	require.NoError(t, err, "An error executing loading the ETH module")
 	require.Nil(t, starlarkRunResult.InterpretationError)
 	require.Empty(t, starlarkRunResult.ValidationErrors)
 	require.Nil(t, starlarkRunResult.ExecutionError)
 
-	nodeClientsByServiceIds, err := getElNodeClientsByServiceID(enclaveCtx, idsToQuery)
+	nodeClientsByServiceIds, err := getElNodeClientsByServiceName(enclaveCtx, idsToQuery)
 	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", idsToQuery)
 
 	log.Printf("------------ STARTING TEST CASE ---------------")
@@ -243,27 +244,27 @@ func TestReadGenesisTree(t *testing.T) {
 	kurtosisCtx, err := kurtosis_context.NewKurtosisContextFromLocalEngine()
 	require.NoError(t, err, "An error occurred connecting to the Kurtosis engine")
 
-	enclaveId := enclaves.EnclaveID(fmt.Sprintf(
+	enclaveName := fmt.Sprintf(
 		"%v-%v",
 		testName, time.Now().Unix(),
-	))
-	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveId, isPartitioningEnabled)
+	)
+	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveName, isPartitioningEnabled)
 	require.NoError(t, err, "An error occurred creating the enclave")
 	defer func() {
 		if !isTestInExecution {
-			_ = kurtosisCtx.DestroyEnclave(ctx, enclaveId)
+			_ = kurtosisCtx.DestroyEnclave(ctx, enclaveName)
 			_, _ = kurtosisCtx.Clean(ctx, false)
 		}
 	}()
 
 	log.Printf("------------ EXECUTING MODULE ---------------")
-	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, moduleParams, false)
+	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, moduleParams, false, defaultParallelism)
 	require.NoError(t, err, "An error executing loading the ETH module")
 	require.Nil(t, starlarkRunResult.InterpretationError)
 	require.Empty(t, starlarkRunResult.ValidationErrors)
 	require.Nil(t, starlarkRunResult.ExecutionError)
 
-	nodeClientsByServiceIds, err := getElNodeClientsByServiceID(enclaveCtx, idsToQuery)
+	nodeClientsByServiceIds, err := getElNodeClientsByServiceName(enclaveCtx, idsToQuery)
 	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", idsToQuery)
 
 	log.Printf("------------ STARTING TEST CASE ---------------")
@@ -327,16 +328,16 @@ func initNodeIdsAndRenderModuleParam() string {
 	return strings.ReplaceAll(moduleParamsTemplate, participantsPlaceholder, strings.Join(participantParams, ","))
 }
 
-func getElNodeClientsByServiceID(
+func getElNodeClientsByServiceName(
 	enclaveCtx *enclaves.EnclaveContext,
-	serviceIds []services.ServiceID,
+	serviceIds []services.ServiceName,
 ) (
-	resultNodeClientsByServiceId map[services.ServiceID]*ethclient.Client,
+	resultNodeClientsByServiceId map[services.ServiceName]*ethclient.Client,
 	resultErr error,
 ) {
-	nodeClientsByServiceIds := map[services.ServiceID]*ethclient.Client{}
+	nodeClientsByServiceIds := map[services.ServiceName]*ethclient.Client{}
 	for _, serviceId := range serviceIds {
-		serviceCtx, err := enclaveCtx.GetServiceContext(serviceId)
+		serviceCtx, err := enclaveCtx.GetServiceContext(string(serviceId))
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "A fatal error occurred getting context for service '%v'", serviceId)
 		}
@@ -363,7 +364,7 @@ func getElNodeClientsByServiceID(
 
 func printNodeInfoUntilStopped(
 	ctx context.Context,
-	nodeClientsByServiceIds map[services.ServiceID]*ethclient.Client,
+	nodeClientsByServiceIds map[services.ServiceName]*ethclient.Client,
 ) (func(), error) {
 
 	printingStopChan := make(chan struct{})
@@ -389,7 +390,7 @@ func printNodeInfoUntilStopped(
 
 func getMostRecentNodeBlockWithRetries(
 	ctx context.Context,
-	serviceId services.ServiceID,
+	serviceId services.ServiceName,
 	client *ethclient.Client,
 	attempts int,
 	sleep time.Duration,
@@ -425,11 +426,11 @@ func getMostRecentNodeBlockWithRetries(
 	return resultBlock, resultErr
 }
 
-func printHeader(nodeClientsByServiceIds map[services.ServiceID]*ethclient.Client) {
+func printHeader(nodeClientsByServiceIds map[services.ServiceName]*ethclient.Client) {
 	nodeInfoHeaderStr := nodeInfoPrefix
 	nodeInfoHeaderLine2Str := nodeInfoPrefix
 
-	sortedServiceIds := make([]services.ServiceID, 0, len(nodeClientsByServiceIds))
+	sortedServiceIds := make([]services.ServiceName, 0, len(nodeClientsByServiceIds))
 	for serviceId := range nodeClientsByServiceIds {
 		sortedServiceIds = append(sortedServiceIds, serviceId)
 	}
@@ -444,8 +445,8 @@ func printHeader(nodeClientsByServiceIds map[services.ServiceID]*ethclient.Clien
 	log.Print(nodeInfoHeaderLine2Str)
 }
 
-func printAllNodesInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceID]*ethclient.Client) {
-	nodesCurrentBlock := make(map[services.ServiceID]*types.Block, 4)
+func printAllNodesInfo(ctx context.Context, nodeClientsByServiceIds map[services.ServiceName]*ethclient.Client) {
+	nodesCurrentBlock := make(map[services.ServiceName]*types.Block, 4)
 	for serviceId, client := range nodeClientsByServiceIds {
 		nodeBlock, err := getMostRecentNodeBlockWithRetries(ctx, serviceId, client, retriesAttempts, retriesSleepDuration)
 		if err != nil && isTestInExecution {
@@ -456,12 +457,12 @@ func printAllNodesInfo(ctx context.Context, nodeClientsByServiceIds map[services
 	printAllNodesCurrentBlock(nodesCurrentBlock)
 }
 
-func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*types.Block) {
+func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceName]*types.Block) {
 	if nodeCurrentBlocks == nil {
 		return
 	}
 	nodeInfoStr := nodeInfoPrefix
-	sortedServiceIds := make([]services.ServiceID, 0, len(nodeCurrentBlocks))
+	sortedServiceIds := make([]services.ServiceName, 0, len(nodeCurrentBlocks))
 	for serviceId := range nodeCurrentBlocks {
 		sortedServiceIds = append(sortedServiceIds, serviceId)
 	}
@@ -485,7 +486,7 @@ func printAllNodesCurrentBlock(nodeCurrentBlocks map[services.ServiceID]*types.B
 
 func getMostRecentBlockAndStoreIt(
 	ctx context.Context,
-	serviceId services.ServiceID,
+	serviceId services.ServiceName,
 	serviceClient *ethclient.Client,
 	nodeBlocksByServiceIds *sync.Map,
 ) error {
@@ -501,8 +502,8 @@ func getMostRecentBlockAndStoreIt(
 
 func waitUntilAllNodesGetSynced(
 	ctx context.Context,
-	serviceIds []services.ServiceID,
-	nodeClientsByServiceIds map[services.ServiceID]*ethclient.Client,
+	serviceIds []services.ServiceName,
+	nodeClientsByServiceIds map[services.ServiceName]*ethclient.Client,
 	minimumBlockNumberConstraint uint64,
 ) (uint64, error) {
 	var wg sync.WaitGroup
@@ -564,6 +565,6 @@ func waitUntilAllNodesGetSynced(
 	}
 }
 
-func renderServiceId(template string, nodeId int) services.ServiceID {
-	return services.ServiceID(fmt.Sprintf(template, nodeId))
+func renderServiceId(template string, nodeId int) services.ServiceName {
+	return services.ServiceName(fmt.Sprintf(template, nodeId))
 }
