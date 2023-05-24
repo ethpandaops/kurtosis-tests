@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"os/exec"
 	"sort"
 	"strings"
 	"sync"
@@ -566,4 +567,64 @@ func waitUntilAllNodesGetSynced(
 
 func renderServiceId(template string, nodeId int) services.ServiceID {
 	return services.ServiceID(fmt.Sprintf(template, nodeId))
+}
+
+func TestCrashingMethodHandler(t *testing.T) {
+	isTestInExecution = true
+	moduleParams := initNodeIdsAndRenderModuleParam()
+
+	ctx := context.Background()
+
+	log.Printf("------------ CONNECTING TO KURTOSIS ENGINE ---------------")
+	kurtosisCtx, err := kurtosis_context.NewKurtosisContextFromLocalEngine()
+	require.NoError(t, err, "An error occurred connecting to the Kurtosis engine")
+
+	enclaveId := enclaves.EnclaveID(fmt.Sprintf(
+		"%v-%v",
+		testName, time.Now().Unix(),
+	))
+	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveId, isPartitioningEnabled)
+	require.NoError(t, err, "An error occurred creating the enclave")
+	defer func() {
+		if !isTestInExecution {
+			_ = kurtosisCtx.DestroyEnclave(ctx, enclaveId)
+			_, _ = kurtosisCtx.Clean(ctx, false)
+		}
+	}()
+
+	log.Printf("------------ EXECUTING MODULE ---------------")
+	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, moduleParams, false)
+	require.NoError(t, err, "An error executing loading the ETH module")
+	require.Nil(t, starlarkRunResult.InterpretationError)
+	require.Empty(t, starlarkRunResult.ValidationErrors)
+	require.Nil(t, starlarkRunResult.ExecutionError)
+
+	nodeClientsByServiceIds, err := getElNodeClientsByServiceID(enclaveCtx, idsToQuery)
+	require.NoError(t, err, "An error occurred when trying to get the node clients for services with IDs '%+v'", idsToQuery)
+
+	log.Printf("------------ STARTING TEST CASE ---------------")
+	stopPrintingFunc, err := printNodeInfoUntilStopped(
+		ctx,
+		nodeClientsByServiceIds,
+	)
+	require.NoError(t, err, "An error occurred launching the node info printer thread")
+	defer stopPrintingFunc()
+
+	log.Printf("------------ CHECKING ALL NODES ARE IN SYNC AT BLOCK '%d' ---------------", minBlocksBeforeDeployment)
+	syncedBlockNumber, err := waitUntilAllNodesGetSynced(ctx, idsToQuery, nodeClientsByServiceIds, minBlocksBeforeDeployment)
+	require.NoError(t, err, "An error occurred waiting until all nodes get synced before inducing the partition")
+	log.Printf("------------ ALL NODES SYNCED AT BLOCK NUMBER '%v' ------------", syncedBlockNumber)
+	printAllNodesInfo(ctx, nodeClientsByServiceIds)
+	log.Printf("------------ VERIFIED ALL NODES ARE IN SYNC BEFORE SENDING THE TX ------------")
+
+	cmd := exec.Command("npm", "run", "aave:condrieu:full:migration:add-registry")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Log(output)
+		t.Fatal(err)
+	}
+
+	// Test teardown phase
+	isTestInExecution = false
+	log.Printf("------------ TEST FINISHED ---------------")
 }
