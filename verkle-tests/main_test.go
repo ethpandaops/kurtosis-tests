@@ -321,9 +321,9 @@ func compareContractData(expectedContractData []byte, receivedContractData []byt
 }
 func initNodeIdsAndRenderModuleParam() string {
 	participantParams := make([]string, numParticipants)
-	for idx := 1; idx <= numParticipants; idx++ {
+	for idx := 0; idx < numParticipants; idx++ {
 		nodeIds[idx] = idx
-		idsToQuery[idx] = renderServiceId(elNodeIdTemplate, nodeIds[idx])
+		idsToQuery[idx] = renderServiceId(elNodeIdTemplate, nodeIds[idx]+1)
 		participantParams[idx] = participantParam
 	}
 	return strings.ReplaceAll(moduleParamsTemplate, participantsPlaceholder, strings.Join(participantParams, ","))
