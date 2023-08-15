@@ -68,8 +68,8 @@ const (
 	minSlotsBeforeDeployment = 5
 	minSlotsAfterDeployment  = 5
 
-	elNodeIdTemplate       = "el-client-%d"
-	clNodeBeaconIdTemplate = "cl-client-%d-beacon"
+	elNodeIdTemplate       = "el-%d-geth-lighthouse"
+	clNodeBeaconIdTemplate = "cl-%d-lighthouse-geth"
 
 	rpcPortId        = "rpc"
 	beaconHttpPortId = "http"
