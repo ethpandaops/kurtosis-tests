@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/kurtosis-tech/kurtosis/api/golang/core/kurtosis_core_rpc_api_bindings"
 	"log"
 	"math/big"
 	"sort"
@@ -80,6 +81,9 @@ const (
 	retriesSleepDuration = 10 * time.Millisecond
 
 	defaultParallelism = 4
+
+	relativePathToMainFile = ""
+	mainFunctionName       = ""
 )
 
 var (
@@ -126,7 +130,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 		"%v-%v",
 		testName, time.Now().Unix(),
 	)
-	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveName, isPartitioningEnabled)
+	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveName)
 	require.NoError(t, err, "An error occurred creating the enclave")
 	defer func() {
 		if !isTestInExecution {
@@ -136,7 +140,7 @@ func TestExtCopyInContractDeployment(t *testing.T) {
 	}()
 
 	log.Printf("------------ EXECUTING MODULE ---------------")
-	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, moduleParams, false, defaultParallelism)
+	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, relativePathToMainFile, mainFunctionName, moduleParams, false, 0, []kurtosis_core_rpc_api_bindings.KurtosisFeatureFlag{})
 	require.NoError(t, err, "An error executing loading the ETH module")
 	require.Nil(t, starlarkRunResult.InterpretationError)
 	require.Empty(t, starlarkRunResult.ValidationErrors)
@@ -247,7 +251,7 @@ func TestReadGenesisTree(t *testing.T) {
 		"%v-%v",
 		testName, time.Now().Unix(),
 	)
-	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveName, isPartitioningEnabled)
+	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveName)
 	require.NoError(t, err, "An error occurred creating the enclave")
 	defer func() {
 		if !isTestInExecution {
@@ -257,7 +261,7 @@ func TestReadGenesisTree(t *testing.T) {
 	}()
 
 	log.Printf("------------ EXECUTING MODULE ---------------")
-	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, moduleParams, false, defaultParallelism)
+	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, relativePathToMainFile, mainFunctionName, moduleParams, false, 0, []kurtosis_core_rpc_api_bindings.KurtosisFeatureFlag{})
 	require.NoError(t, err, "An error executing loading the ETH module")
 	require.Nil(t, starlarkRunResult.InterpretationError)
 	require.Empty(t, starlarkRunResult.ValidationErrors)

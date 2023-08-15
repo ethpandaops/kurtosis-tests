@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethpandaops/beacon/pkg/beacon"
+	"github.com/kurtosis-tech/kurtosis/api/golang/core/kurtosis_core_rpc_api_bindings"
 	"github.com/kurtosis-tech/kurtosis/api/golang/core/lib/enclaves"
 	"github.com/kurtosis-tech/kurtosis/api/golang/core/lib/services"
 	"github.com/kurtosis-tech/kurtosis/api/golang/engine/lib/kurtosis_context"
@@ -35,8 +36,7 @@ This test demonstrates basic Ethereum testnet behaviour in Kurtosis.
 */
 
 const (
-	testName              = "go-ethereum-testnet-with-contract"
-	isPartitioningEnabled = true
+	testName = "go-ethereum-testnet-with-contract"
 
 	nodeInfoPrefix = "NODES STATUS -- |"
 
@@ -68,14 +68,14 @@ const (
 	minSlotsBeforeDeployment = 5
 	minSlotsAfterDeployment  = 5
 
-	elNodeIdTemplate          = "el-client-%d"
-	clNodeBeaconIdTemplate    = "cl-client-%d-beacon"
-	clNodeValidatorIdTemplate = "cl-client-%d-validator"
+	elNodeIdTemplate       = "el-client-%d"
+	clNodeBeaconIdTemplate = "cl-client-%d-beacon"
 
-	rpcPortId            = "rpc"
-	beaconHttpPortId     = "http"
-	retriesAttempts      = 20
-	retriesSleepDuration = 10 * time.Millisecond
+	rpcPortId        = "rpc"
+	beaconHttpPortId = "http"
+
+	relativePathToMainFile = ""
+	mainFunctionName       = ""
 )
 
 var (
@@ -100,7 +100,7 @@ func TestBasicTestnetFinality(t *testing.T) {
 		"%v-%v",
 		testName, time.Now().Unix(),
 	)
-	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveName, isPartitioningEnabled)
+	enclaveCtx, err := kurtosisCtx.CreateEnclave(ctx, enclaveName)
 	require.NoError(t, err, "An error occurred creating the enclave")
 	defer func() {
 		if !isTestInExecution {
@@ -110,7 +110,7 @@ func TestBasicTestnetFinality(t *testing.T) {
 	}()
 
 	log.Printf("------------ EXECUTING MODULE ---------------")
-	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, moduleParams, false, 0)
+	starlarkRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, eth2StarlarkPackage, relativePathToMainFile, mainFunctionName, moduleParams, false, 0, []kurtosis_core_rpc_api_bindings.KurtosisFeatureFlag{})
 	require.NoError(t, err, "An error executing loading the ETH module")
 	require.Nil(t, starlarkRunResult.InterpretationError)
 	require.Empty(t, starlarkRunResult.ValidationErrors)
