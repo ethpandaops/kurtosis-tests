@@ -150,7 +150,7 @@ func TestBasicTestnetFinality(t *testing.T) {
 
 func initNodeIdsAndRenderModuleParam() string {
 	participantParams := make([]string, numParticipants)
-	for idx := 0; idx < numParticipants; idx++ {
+	for idx := 1; idx <= numParticipants; idx++ {
 		nodeIds[idx] = idx
 		elIdsToQuery[idx] = renderServiceId(elNodeIdTemplate, nodeIds[idx])
 		clIdsToQuery[idx] = renderServiceId(clNodeBeaconIdTemplate, nodeIds[idx])
