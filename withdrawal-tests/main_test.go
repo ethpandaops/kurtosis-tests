@@ -43,12 +43,12 @@ const (
 	eth2StarlarkPackage = "github.com/kurtosis-tech/eth2-package"
 
 	// must be something greater than 4 to have at least 2 nodes in each partition
-	numParticipants = 4
+	numParticipants = 3
 
 	participantsPlaceholder = "{{participants_param}}"
 	//TODO: Replace with image pulled from commit ref
 	//participantParam        = `{"elType":"geth","elImage":"ethereum/client-go:v1.10.25","clType":"lodestar","clImage":"chainsafe/lodestar:v1.1.0"}`
-	participantParam = `{"el_client_type":"geth","el_client_image":"ethereum/client-go:v1.11.2","cl_client_type":"lighthouse","cl_client_image":"sigp/lighthouse:v3.5.0"}`
+	participantParam = `{"el_client_type":"geth","el_client_image":"ethereum/client-go:v1.12.2","cl_client_type":"lighthouse","cl_client_image":"sigp/lighthouse:v4.3.0"}`
 	// Sets parameters to run the kurtosis module with
 	// launch_additional_services decides if grafana, forkmon and other additional servies are launched
 	// participants sets the included clients
