@@ -9,8 +9,8 @@
       "cl_client_type": "teku"
     },
     {
-      "el_client_type": "nethermind",
-      "cl_client_type": "teku"
+      "el_client_type": "besu",
+      "cl_client_type": "prysm"
     }
   ]
 }
