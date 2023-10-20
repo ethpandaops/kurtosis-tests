@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/kurtosis-tech/kurtosis/api/golang/core/lib/starlark_run_config"
 	"net/http"
 	"os"
 	"strconv"
@@ -91,7 +92,17 @@ func TestEthPackage_FinalizationSyncing(t *testing.T) {
 	// execute package
 	logrus.Info("Executing the Starlark Package")
 	logrus.Infof("Using Enclave '%v' - use `kurtosis enclave inspect %v` to see whats inside", enclaveName, enclaveName)
-	packageRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, ethPackage, pathToMainFile, runFunctionName, inputParametersAsJSONString, isNotDryRun, defaultParallelism, noExperimentalFeatureFlags)
+
+	StarlarkConfig := starlark_run_config.StarlarkRunConfig{
+		RelativePathToMainFile:   pathToMainFile,
+		MainFunctionName:         runFunctionName,
+		SerializedParams:         inputParametersAsJSONString,
+		DryRun:                   isNotDryRun,
+		Parallelism:              defaultParallelism,
+		ExperimentalFeatureFlags: noExperimentalFeatureFlags,
+	}
+
+	packageRunResult, err := enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, ethPackage, &StarlarkConfig)
 	require.NoError(t, err, "An unexpected error occurred while executing the package")
 	require.Nil(t, packageRunResult.InterpretationError)
 	require.Empty(t, packageRunResult.ValidationErrors)
