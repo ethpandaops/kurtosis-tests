@@ -12,5 +12,9 @@
       "el_client_type": "besu",
       "cl_client_type": "prysm"
     }
+  ],
+  "additional_services": [
+    "goomy_blob",
+    "tx_fuzz"
   ]
 }
