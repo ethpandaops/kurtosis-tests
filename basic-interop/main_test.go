@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/kurtosis-tech/kurtosis/api/golang/core/lib/starlark_run_config"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -13,18 +13,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kurtosis-tech/kurtosis/api/golang/core/lib/starlark_run_config"
+
 	"github.com/ethpandaops/kurtosis-tests/types"
 	"github.com/kurtosis-tech/kurtosis/api/golang/core/kurtosis_core_rpc_api_bindings"
 	"github.com/kurtosis-tech/kurtosis/api/golang/core/lib/services"
 	"github.com/kurtosis-tech/kurtosis/api/golang/engine/lib/kurtosis_context"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
+
+func init() {
+	// Set up logger with timestamps and ensure output is visible
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
+	log.SetOutput(os.Stdout)
+}
 
 const (
 	enclaveNamePrefix  = "finalization-test"
-	ethPackage         = "github.com/kurtosis-tech/ethereum-package"
-	inputFile          = "./input_args.json"
+	ethPackage         = "github.com/ethpandaops/ethereum-package"
+	inputFile          = "./input_args.yaml"
 	defaultParallelism = 4
 	isNotDryRun        = false
 
@@ -65,15 +73,23 @@ var noExperimentalFeatureFlags = []kurtosis_core_rpc_api_bindings.KurtosisFeatur
 
 func TestEthPackage_FinalizationSyncing(t *testing.T) {
 	// set up the input parameters
-	logrus.Info("Parsing Input Parameters")
+	log.Println("Parsing Input Parameters")
 	inputParameters, err := os.ReadFile(inputFile)
 	require.NoError(t, err, "An error occurred while reading the input file")
 	require.NotEmpty(t, inputParameters, "Input parameters byte array is unexpectedly empty")
-	inputParametersAsJSONString := string(inputParameters)
-	require.NotEmpty(t, inputParametersAsJSONString, "Input parameter json string is unexpectedly empty")
+
+	var inputParams map[string]interface{}
+	err = yaml.Unmarshal(inputParameters, &inputParams)
+	require.NoError(t, err, "An error occurred while parsing YAML")
+
+	// Convert back to YAML to ensure proper formatting
+	yamlBytes, err := yaml.Marshal(inputParams)
+	require.NoError(t, err, "An error occurred while converting to YAML")
+	inputParametersAsYAMLString := string(yamlBytes)
+	require.NotEmpty(t, inputParametersAsYAMLString, "Input parameter YAML string is unexpectedly empty")
 
 	// set up enclave
-	logrus.Info("Setting up Kurtosis Engine Connection & Enclave")
+	log.Println("Setting up Kurtosis Engine Connection & Enclave")
 	ctx, cancelCtxFunc := context.WithCancel(context.Background())
 	defer cancelCtxFunc()
 	kurtosisCtx, err := kurtosis_context.NewKurtosisContextFromLocalEngine()
@@ -90,13 +106,13 @@ func TestEthPackage_FinalizationSyncing(t *testing.T) {
 	}()
 
 	// execute package
-	logrus.Info("Executing the Starlark Package")
-	logrus.Infof("Using Enclave '%v' - use `kurtosis enclave inspect %v` to see whats inside", enclaveName, enclaveName)
+	log.Println("Executing the Starlark Package")
+	log.Printf("Using Enclave '%v' - use `kurtosis enclave inspect %v` to see whats inside", enclaveName, enclaveName)
 
 	StarlarkConfig := starlark_run_config.StarlarkRunConfig{
 		RelativePathToMainFile:   pathToMainFile,
 		MainFunctionName:         runFunctionName,
-		SerializedParams:         inputParametersAsJSONString,
+		SerializedParams:         inputParametersAsYAMLString,
 		DryRun:                   isNotDryRun,
 		Parallelism:              defaultParallelism,
 		ExperimentalFeatureFlags: noExperimentalFeatureFlags,
@@ -116,13 +132,13 @@ func TestEthPackage_FinalizationSyncing(t *testing.T) {
 	for serviceName := range enclaveServices {
 		serviceNameStr := string(serviceName)
 		if strings.HasPrefix(serviceNameStr, clPrefix) && !strings.HasSuffix(serviceNameStr, validatorSuffix) && !strings.HasSuffix(serviceNameStr, forkmonSuffix) {
-			logrus.Infof("Found beacon node with name '%s'", serviceNameStr)
+			log.Printf("Found beacon node with name '%s'", serviceNameStr)
 			beaconService, err := enclaveCtx.GetServiceContext(serviceNameStr)
 			require.NoError(t, err)
 			beaconNodeServiceContexts = append(beaconNodeServiceContexts, beaconService)
 		}
 		if strings.HasPrefix(serviceNameStr, elPrefix) && !strings.HasSuffix(serviceNameStr, forkmonSuffix) {
-			logrus.Infof("Found el node with name '%s'", serviceNameStr)
+			log.Printf("Found el node with name '%s'", serviceNameStr)
 			elService, err := enclaveCtx.GetServiceContext(serviceNameStr)
 			require.NoError(t, err)
 			elNodeServiceContexts = append(elNodeServiceContexts, elService)
@@ -133,7 +149,7 @@ func TestEthPackage_FinalizationSyncing(t *testing.T) {
 	checkAllCLNodesAreSynced(t, beaconNodeServiceContexts)
 	checkAllElNodesAreSynced(t, elNodeServiceContexts)
 
-	logrus.Info("Finalization has happened and all nodes are fully synced")
+	log.Println("Finalization has happened and all nodes are fully synced")
 
 	cleanupEnclavesAsTestsEndedSuccessfully = true
 }
@@ -150,11 +166,11 @@ func checkFinalizationHasHappened(t *testing.T, beaconNodeServiceContexts []*ser
 				beaconHttpPort, found := publicPorts[beaconServiceHttpPortId]
 				require.True(t, found)
 				epochsFinalized := getFinalizedEpoch(t, beaconHttpPort.GetNumber())
-				logrus.Infof("Queried service '%s' got finalized epoch '%d'", beaconNodeServiceCtx.GetServiceName(), epochsFinalized)
+				log.Printf("Queried service '%s' got finalized epoch '%d'", beaconNodeServiceCtx.GetServiceName(), epochsFinalized)
 				if epochsFinalized > 0 {
 					break
 				} else {
-					logrus.Infof(sleepIntervalMessage, beaconNodeServiceCtx.GetServiceName(), finalizationRetryInterval.Seconds())
+					log.Printf(sleepIntervalMessage, beaconNodeServiceCtx.GetServiceName(), finalizationRetryInterval.Seconds())
 				}
 				time.Sleep(finalizationRetryInterval)
 			}
@@ -177,11 +193,11 @@ func checkAllCLNodesAreSynced(t *testing.T, beaconNodeServiceContexts []*service
 				require.True(t, found)
 				isSyncing := isCLSyncing(t, beaconHttpPort.GetNumber())
 				if !isSyncing {
-					logrus.Infof(fullySyncedMessage, beaconNodeServiceCtx.GetServiceName())
+					log.Printf(fullySyncedMessage, beaconNodeServiceCtx.GetServiceName())
 					break
 				} else {
-					logrus.Infof(stillSyncingMessage, beaconNodeServiceCtx.GetServiceName())
-					logrus.Infof(sleepIntervalMessage, beaconNodeServiceCtx.GetServiceName(), syncRetryInterval.Seconds())
+					log.Printf(stillSyncingMessage, beaconNodeServiceCtx.GetServiceName())
+					log.Printf(sleepIntervalMessage, beaconNodeServiceCtx.GetServiceName(), syncRetryInterval.Seconds())
 				}
 				time.Sleep(syncRetryInterval)
 			}
@@ -204,11 +220,11 @@ func checkAllElNodesAreSynced(t *testing.T, elNodeServiceContexts []*services.Se
 				require.True(t, found)
 				isSyncing := isELSyncing(t, rpcPort.GetNumber())
 				if !isSyncing {
-					logrus.Infof(fullySyncedMessage, elNodeServiceCtx.GetServiceName())
+					log.Printf(fullySyncedMessage, elNodeServiceCtx.GetServiceName())
 					break
 				} else {
-					logrus.Infof(stillSyncingMessage, elNodeServiceCtx.GetServiceName())
-					logrus.Infof(sleepIntervalMessage, elNodeServiceCtx.GetServiceName(), syncRetryInterval.Seconds())
+					log.Printf(stillSyncingMessage, elNodeServiceCtx.GetServiceName())
+					log.Printf(sleepIntervalMessage, elNodeServiceCtx.GetServiceName(), syncRetryInterval.Seconds())
 				}
 				time.Sleep(syncRetryInterval)
 			}
@@ -217,7 +233,6 @@ func checkAllElNodesAreSynced(t *testing.T, elNodeServiceContexts []*services.Se
 	}
 	didWaitTimeout := didWaitGroupTimeout(&elClientSyncWaitGroup, timeoutForSync)
 	require.False(t, didWaitTimeout, "EL nodes weren't fully synced in the expected amount of time '%v'", timeoutForSync.Seconds())
-
 }
 
 func getFinalizedEpoch(t *testing.T, beaconHttpPort uint16) int {
