@@ -1,0 +1,9 @@
+participants:
+  - el_type: geth
+    cl_type: teku
+  - el_type: geth
+    cl_type: prysm
+  - el_type: besu
+    cl_type: lighthouse
+network_params:
+  preset: minimal
